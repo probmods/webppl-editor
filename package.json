@@ -1,0 +1,20 @@
+{
+  "name": "wp-editor",
+  "version": "0.0.1",
+  "description": "browser editor for webppl",
+  "main": "src/index.js",
+  "dependencies": {
+    "babel-preset-react": "^6.1.18",
+    "react": "^0.14.3",
+    "react-codemirror": "^0.2.2",
+    "react-dom": "^0.14.3",
+    "babelify": "^7.2.0",
+    "jquery": "^2.1.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "long ouyang",
+  "license": "ISC"
+}
