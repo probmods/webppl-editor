@@ -35,7 +35,7 @@ var ResultText = React.createClass({
 
 var Result = React.createClass({
   getInitialState: function() {
-    return {pieces: []};
+    return {fresh: true, pieces: []};
   },
   clear: function() {
     this.setState({
@@ -52,14 +52,21 @@ var Result = React.createClass({
       return {pieces: state.pieces.concat(x)}
     });
   },
+  getClassNames: function() {
+    return this.state.fresh ? 'result' : 'result stale';
+  },
   render: function() {
     var piecesKeyed = this.state.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
     return (
-      <div className='result'>
+      <div className={this.getClassNames()}>
         {piecesKeyed}
       </div>);
   }
 });
+
+var wait = function(ms,f) {
+  return setTimeout(f,ms);
+}
 
 var CodeEditor = React.createClass({
   getInitialState: function() {
@@ -69,6 +76,7 @@ var CodeEditor = React.createClass({
   },
   runCode: function() {
     var result = this.refs.result;
+    result.setState({fresh: false});
 
     global.print = function(s,k,a,x) {
       result.add(<ResultText message={x} />);
@@ -78,17 +86,26 @@ var CodeEditor = React.createClass({
     // var compiled = webppl.compile(this.props.input.props.value);
     // console.log(compiled);
 
-    result.clear();
+    var code = this.state.code;
+    // pause 30ms so that the stale style is applied
+    // might wanna do this with didComponentUpdate instead
+    // see http://stackoverflow.com/a/28748160/351392
+    wait(30,function() {
+      try {
+        result.setState({pieces: []});
+        webppl.run(code,
+                   function(s, x) {
+                     result.add(<ResultText message={JSON.stringify(x)} />);
+                     result.setState({fresh: true});
+                   },
+                   true);
+      } catch(e) {
+        var err = (<ResultError message={e.message} />)
+        result.add(err);
+        result.setState({fresh: true})
+      }
+    });
 
-    try {
-      webppl.run(this.state.code,
-                 function(s, x) { result.add(<ResultText message={JSON.stringify(x)} />); },
-                 true);
-    } catch(e) {
-      //result.text('error: ' + e.message)
-      var err = (<ResultError message={e.message} />)
-      result.add(err);
-    }
 
   },
   updateCode: function(newCode) {

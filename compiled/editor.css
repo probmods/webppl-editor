@@ -10,3 +10,7 @@
 pre.error {
     color: red
 }
+
+.stale {
+    opacity: 0.2
+}
