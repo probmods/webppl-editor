@@ -1,53 +1,53 @@
 <html>
-    <head>
-        <link rel='stylesheet' type='text/css' href='codemirror-5.8.0.css'>
-        <style>
-         pre {
-             border: 1px solid black;
-             border-radius: 2px;
-             margin: 0;
-             padding: 4px;
-         }
+  <head>
+    <link rel='stylesheet' type='text/css' href='codemirror-5.8.0.css'>
+    <style>
+     pre {
+         border: 1px solid black;
+         border-radius: 2px;
+         margin: 0;
+         padding: 4px;
+     }
 
-         pre > code {
-             color: #bfbfbf;
-         }
+     pre > code {
+         color: #bfbfbf;
+     }
 
-         .CodeMirror-lines {
-             border: 1px solid black;
-             border-radius: 2px;
-         }
+     .CodeMirror-lines {
+         border: 1px solid black;
+         border-radius: 2px;
+     }
 
-         button.run {
-             border: 1px solid gray;
-             font-family: Menlo;
-             background-color: #e0e0e0;
-             margin: 0.5em 0 0.5em 0;
-             padding: 0.5em 1em;
-         }
+     button.run {
+         border: 1px solid gray;
+         font-family: Menlo;
+         background-color: #e0e0e0;
+         margin: 0.5em 0 0.5em 0;
+         padding: 0.5em 1em;
+     }
 
-         button.run:hover {
-             cursor: pointer
-         }
+     button.run:hover {
+         cursor: pointer
+     }
 
-         button.run:active {
-             background-color: #a0a0a0;
-         }
+     button.run:active {
+         background-color: #a0a0a0;
+     }
 
 
-        </style>
-    </head>
-    <body>
-        <p>some text before</p>
-        <pre id="foo"><code>print('1'); print('2'); print('3'); print('4')</code></pre>
-        <p>some text after</p>
-        <pre id="bar"><code>1 + 1</code></pre>
-    </body>
-    <script src="webppl.js"></script>
-    <script src="editor.js"></script>
-    <script src="jquery.js"></script>
-    <script>
-        installEditor(webppl);
-        $("pre").map(function(i,el) { webppl.editor.code(el); })
-    </script
+    </style>
+  </head>
+  <body>
+    <p>some text before</p>
+    <pre id="foo"><code>print('1'); print('2'); print('3'); print('4')</code></pre>
+    <p>some text after</p>
+    <pre id="bar"><code>1 + 1</code></pre>
+  </body>
+  <script src="webppl.js"></script>
+  <script src="editor.js"></script>
+  <script src="jquery.js"></script>
+  <script>
+    installEditor(webppl);
+    $("pre").map(function(i,el) { webppl.editor.code(el); })
+  </script
 </html>
