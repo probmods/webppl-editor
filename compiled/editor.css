@@ -1,0 +1,12 @@
+.result {
+    border: 1px solid gray;
+    border-radius: 2px;
+}
+
+.result pre {
+    border: none
+}
+
+pre.error {
+    color: red
+}

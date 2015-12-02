@@ -11,61 +11,52 @@ var Codemirror = require('react-codemirror');
 var $ = require('jquery');
 //global.$ = $;
 
-// // doesn't work
-// require('codemirror/mode/javascript/javascript');
-
-//require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
+require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
+// NB: require('codemirror/mode/javascript/javascript') doesn't work
 // might be able to avoid reaching into react-codemirror's copy of codemirror
 // by doing some browserify tricks with -x or -r or factor-bundle (TODO: investigate)
 
-var RunButton = React.createClass({
-
-  handleClick: function() {
-    var append = this.props.result.append;
-
-    global.print = function(s,k,a,x) {
-      append(x);
-      return k(s);
-    }
-
-    var compiled = webppl.compile(this.props.input.props.value);
-    console.log(compiled);
-
-    this.props.result.clear();
-
-    webppl.run(this.props.input.props.value,
-               function(s, x) {  },
-               true);
-  },
+var ResultError = React.createClass({
   render: function() {
     return (
-      <button ref='runbutton' className='run' type="button" onClick={this.handleClick}>run</button>
+        <pre key={this.props.key} className='error'>{this.props.message}</pre>
     );
   }
 });
 
+var ResultText = React.createClass({
+  render: function() {
+    return (
+        <pre key={this.props.key} className='text'>{this.props.message}</pre>
+    );
+  }
+});
+
+
 var Result = React.createClass({
   getInitialState: function() {
-    return {messages: []};
+    return {pieces: []};
   },
   clear: function() {
     this.setState({
-      messages: []
+      pieces: []
     })
   },
-  append: function(x) {
-    var messages = this.state.messages.slice();
-    messages.push(x);
-    console.log(messages.join(','));
-    this.setState({
-      messages: messages
+  add: function(x) {
+    // NB: calling this.setState on an object with an updated messages
+    // property resulted in weird bugs.
+    // might be related to:
+    //    "There is no guarantee of synchronous operation of calls to
+    //    setState and calls may be batched for performance gains."
+    this.setState(function(state, props) {
+      return {pieces: state.pieces.concat(x)}
     });
   },
   render: function() {
-    var ps = this.state.messages.map(function(x,i) { return (<p key={i}>{x}</p>) });
+    var piecesKeyed = this.state.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
     return (
-      <div>
-          {ps}
+      <div className='result'>
+        {piecesKeyed}
       </div>);
   }
 });
@@ -75,6 +66,30 @@ var CodeEditor = React.createClass({
     return {
       code: this.props.code
     }
+  },
+  runCode: function() {
+    var result = this.refs.result;
+
+    global.print = function(s,k,a,x) {
+      result.add(<ResultText message={x} />);
+      return k(s);
+    };
+
+    // var compiled = webppl.compile(this.props.input.props.value);
+    // console.log(compiled);
+
+    result.clear();
+
+    try {
+      webppl.run(this.state.code,
+                 function(s, x) { result.add(<ResultText message={JSON.stringify(x)} />); },
+                 true);
+    } catch(e) {
+      //result.text('error: ' + e.message)
+      var err = (<ResultError message={e.message} />)
+      result.add(err);
+    }
+
   },
   updateCode: function(newCode) {
     this.setState({
@@ -92,7 +107,7 @@ var CodeEditor = React.createClass({
     return (
       <div ref="cont">
           <Codemirror ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
-          <RunButton ref="runbutton" input={this.refs.editor} result={this.refs.result} />
+          <button className='run' type="button" onClick={this.runCode}>run</button>
           <Result ref="result" value={this.state.result} />
       </div>
     );
@@ -100,10 +115,6 @@ var CodeEditor = React.createClass({
 
   }
 });
-
-global.print = function(s,k,a,x) {
-
-}
 
 // var Result = React.createClass({
 //   getInitialState: function() {

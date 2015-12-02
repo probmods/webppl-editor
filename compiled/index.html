@@ -2,6 +2,10 @@
   <head>
     <link rel='stylesheet' type='text/css' href='codemirror-5.8.0.css'>
     <style>
+     body {
+         font-family: Menlo
+     }
+
      pre {
          border: 1px solid black;
          border-radius: 2px;
@@ -34,14 +38,22 @@
          background-color: #a0a0a0;
      }
 
+     #wrapper {
+         width: 50%;
+         margin: 0 auto;
+     }
 
     </style>
+    <link rel='stylesheet' type='text/css' href='editor.css'>
   </head>
   <body>
-    <p>some text before</p>
-    <pre id="foo"><code>print('1'); print('2'); print('3'); print('4')</code></pre>
-    <p>some text after</p>
-    <pre id="bar"><code>1 + 1</code></pre>
+    <div id="wrapper">
+      <h2>foo</h2>
+      <pre id="foo"><code>print('1');
+print('2');
+print('3');
+print('4');</code></pre>
+    </div>
   </body>
   <script src="webppl.js"></script>
   <script src="editor.js"></script>
