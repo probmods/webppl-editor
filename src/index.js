@@ -9,7 +9,12 @@ var ReactDOM = require('react-dom');
 var Codemirror = require('react-codemirror');
 
 var $ = require('jquery');
-//global.$ = $;
+global.$ = $;
+
+global.d3 = require('d3');
+var vl = require('vega-lite');
+var vg = require('vega');
+
 
 require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
 // NB: require('codemirror/mode/javascript/javascript') doesn't work
@@ -32,6 +37,55 @@ var ResultText = React.createClass({
   }
 });
 
+
+var ResultHist = React.createClass({
+  render: function() {
+    var samples = this.props.samples;
+    var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+    var labels = _(frequencyDict).keys();
+    var counts = _(frequencyDict).values();
+
+    var frequencyDf = _.zip(labels,counts).map(function(a) {
+      return {label: a[0], count: a[1]}
+    });
+
+    var vlspec = {
+      data: {values: frequencyDf},
+      marktype: "bar",
+      encoding: {
+        x: {type: "O", name: "label"},
+        y: {type: "Q", name: "count"}
+      }
+    };
+
+    var vgspec = vl.compile(vlspec);
+    var visEl = (
+        <div>
+        </div>
+    );
+
+    var me = this;
+
+    vg.parse.spec(vgspec, function(chart) {
+      console.log('inside vega callback')
+      var view = chart({renderer: 'svg'}).update();
+      wait(500, function() {
+        $(ReactDOM.findDOMNode(me)).html(view.svg());
+      })
+    });
+
+    console.log('inside ResultHist render');
+
+    // var foo = vg.parse.spec(vgspec, function(chart) {
+    //   var view = chart({renderer: 'svg'}).update();
+    //   return view.svg();
+    // });
+
+    console.log(visEl)
+    return visEl;
+
+  }
+});
 
 var Result = React.createClass({
   getInitialState: function() {
@@ -64,6 +118,8 @@ var Result = React.createClass({
   }
 });
 
+//var hist = function(
+
 var wait = function(ms,f) {
   return setTimeout(f,ms);
 }
@@ -82,6 +138,12 @@ var CodeEditor = React.createClass({
       result.add(<ResultText message={x} />);
       return k(s);
     };
+
+    global.hist = function(s, k, a, samples) {
+      result.add(<ResultHist samples={samples} />);
+      return k(s);
+    }
+
 
     // var compiled = webppl.compile(this.props.input.props.value);
     // console.log(compiled);

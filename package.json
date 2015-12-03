@@ -3,16 +3,27 @@
   "version": "0.0.1",
   "description": "browser editor for webppl",
   "main": "src/index.js",
+  "browserify-shim": {},
   "dependencies": {
     "babel-preset-react": "^6.1.18",
     "babelify": "^7.2.0",
+    "d3": "^3.5.10",
     "jquery": "^2.1.4",
     "react": "^0.14.3",
     "react-codemirror": "^0.2.2",
     "react-dom": "^0.14.3",
-    "underscore": "^1.8.3"
+    "underscore": "^1.8.3",
+    "vega": "^2.4.0",
+    "vega-lite": "^0.8.3"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "browserify": "^12.0.1",
+    "browserify-shim": "^3.8.11",
+    "browserify-versionify": "^1.0.6",
+    "jstransform": "^11.0.3",
+    "through": "^2.3.8",
+    "watchify": "^3.6.1"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
