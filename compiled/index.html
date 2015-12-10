@@ -50,7 +50,10 @@
   <body>
     <div id="wrapper">
       <h2>foo</h2>
-      <pre id="foo"><code>hist(['a','a','b'])</code></pre>
+      <pre id="foo"><code>var samps = repeat(100,
+                   function() { return uniformDraw(['a','b','c']) })
+
+hist(samps)</code></pre>
     </div>
   </body>
   <script src="webppl.js"></script>

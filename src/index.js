@@ -49,16 +49,105 @@ var ResultHist = React.createClass({
       return {label: a[0], count: a[1]}
     });
 
-    var vlspec = {
-      data: {values: frequencyDf},
-      marktype: "bar",
-      encoding: {
-        x: {type: "O", name: "label"},
-        y: {type: "Q", name: "count"}
-      }
+    // var vlspec = {
+    //   data: {values: frequencyDf},
+    //   marktype: "bar",
+    //   encoding: {
+    //     x: {type: "O", name: "label"},
+    //     y: {type: "Q", name: "count"}
+    //   }
+    // };
+
+    // var vgspec = vl.compile(vlspec);
+
+    // TODO: why did the hovering stuff stop working all of a sudden?
+    // i can't even get it working on test-vega.html
+    var vgspec = {
+      "width": 400,
+      "height": labels.length * 30,
+      "padding": {"top": 10, "left": 30, "bottom": 20, "right": 30},
+
+      "data": [
+        {
+          "name": "table",
+          "values": frequencyDf
+        }
+      ],
+
+      "signals": [
+        {
+          "name": "tooltip",
+          "init": {},
+          "streams": [
+            {"type": "rect:mouseover", "expr": "datum"},
+            {"type": "rect:mouseout", "expr": "{}"}
+          ]
+        }
+      ],
+
+      "predicates": [
+        {
+          "name": "tooltip", "type": "==",
+          "operands": [{"signal": "tooltip._id"}, {"arg": "id"}]
+        }
+      ],
+
+      "scales": [
+        { "name": "yscale", "type": "ordinal", "range": "height",
+          "domain": {"data": "table", "field": "label"} },
+        { "name": "xscale", "range": "width", "nice": true,
+          "domain": {"data": "table", "field": "count"} }
+      ],
+
+      "axes": [
+        { "type": "x", "scale": "xscale" },
+        { "type": "y", "scale": "yscale" }
+      ],
+
+      marks: [
+        {
+          "type": "rect",
+          "from": {"data":"table"},
+          "properties": {
+            "enter": {
+              "x": {"scale": "xscale", value: 0},
+              x2: {scale: 'xscale', field: 'count'},
+              "y": {"scale": "yscale", "field": "label"},
+              "height": {"scale": "yscale", "band": true, "offset": -1}
+            },
+            "update": { "fill": {"value": "steelblue"} },
+            "hover": { "fill": {"value": "red"} }
+          }
+        },
+
+        {
+          "type": "text",
+          "properties": {
+            "enter": {
+              "align": {"value": "center"},
+              "fill": {"value": "#333"}
+            },
+            "update": {
+              "x": {"scale": "xscale", "signal": "tooltip.count", "offset": 10},
+              "y": {"scale": "yscale", "signal": "tooltip.label", "offset": 3},
+              "dy": {"scale": "yscale", "band": true, "mult": 0.5},
+              "text": {"signal": "tooltip.count"},
+              "fillOpacity": {
+                "rule": [
+                  {
+                    "predicate": {"name": "tooltip", "id": {"value": null}},
+                    "value": 0
+                  },
+                  {"value": 1}
+                ]
+              }
+            }
+          }
+        }
+
+      ]
     };
 
-    var vgspec = vl.compile(vlspec);
     var visEl = (
         <div>
         </div>
@@ -66,22 +155,18 @@ var ResultHist = React.createClass({
 
     var me = this;
 
-    vg.parse.spec(vgspec, function(chart) {
-      console.log('inside vega callback')
+    vg.parse.spec(vgspec, function(error,chart) {
       var view = chart({renderer: 'svg'}).update();
-      wait(500, function() {
-        $(ReactDOM.findDOMNode(me)).html(view.svg());
+
+      // // TODO: on right clicking the canvas, download the svg version
+      // var $img = $("<img>").attr({src:'data:image/svg+xml;utf8,' +
+      //                             view.svg()})
+
+      wait(0,function() {
+        $(ReactDOM.findDOMNode(me)).html(view.svg())
       })
     });
 
-    console.log('inside ResultHist render');
-
-    // var foo = vg.parse.spec(vgspec, function(chart) {
-    //   var view = chart({renderer: 'svg'}).update();
-    //   return view.svg();
-    // });
-
-    console.log(visEl)
     return visEl;
 
   }
