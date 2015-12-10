@@ -169,31 +169,13 @@ var ResultHist = React.createClass({
 });
 
 var Result = React.createClass({
-  getInitialState: function() {
-    return {fresh: true, pieces: []};
-  },
-  clear: function() {
-    this.setState({
-      pieces: []
-    })
-  },
-  add: function(x) {
-    // NB: calling this.setState on an object with an updated messages
-    // property resulted in weird bugs.
-    // might be related to:
-    //    "There is no guarantee of synchronous operation of calls to
-    //    setState and calls may be batched for performance gains."
-    this.setState(function(state, props) {
-      return {pieces: state.pieces.concat(x)}
-    });
-  },
   getClassNames: function() {
-    return this.state.fresh ? 'result' : 'result stale';
+    return this.props.fresh ? 'result' : 'result stale';
   },
   render: function() {
-    var piecesKeyed = this.state.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
+    var piecesKeyed = this.props.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
     return (
-      <div className={this.getClassNames()}>
+        <div className={this.getClassNames()}>
         {piecesKeyed}
       </div>);
   }
@@ -208,53 +190,60 @@ var wait = function(ms,f) {
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
-      code: this.props.code
+      code: this.props.code,
+      pieces: [],
+      fresh: true
     }
   },
   runCode: function() {
+    this.setState({fresh: false});
+
+    var comp = this;
     var result = this.refs.result;
-    result.setState({fresh: false});
 
     global.print = function(s,k,a,x) {
-      result.add(<ResultText message={x} />);
+      comp.addResult(<ResultText message={x} />);
       return k(s);
     };
 
     global.hist = function(s, k, a, samples) {
-      result.add(<ResultHist samples={samples} />);
+      comp.addResult(<ResultHist samples={samples} />);
       return k(s);
     }
-
 
     // var compiled = webppl.compile(this.props.input.props.value);
     // console.log(compiled);
 
     var code = this.state.code;
+
     // pause 30ms so that the stale style is applied
     // might wanna do this with didComponentUpdate instead
     // see http://stackoverflow.com/a/28748160/351392
     wait(30,function() {
+      comp.setState({pieces: []});
       try {
-        result.setState({pieces: []});
         webppl.run(code,
                    function(s, x) {
-                     result.add(<ResultText message={JSON.stringify(x)} />);
-                     result.setState({fresh: true});
+                     comp.addResult(<ResultText message={JSON.stringify(x)} />);
+                     comp.setState({fresh: true});
                    },
                    true);
       } catch(e) {
         var err = (<ResultError message={e.message} />)
-        result.add(err);
-        result.setState({fresh: true})
+        comp.addResult(err);
+        comp.setState({fresh: true});
       }
     });
-
-
   },
   updateCode: function(newCode) {
     this.setState({
       code: newCode
     })
+  },
+  addResult: function(result) {
+    this.setState(function(state, props) {
+      return {pieces: state.pieces.concat(result)}
+    });
   },
   render: function() {
     var options = {
@@ -268,7 +257,7 @@ var CodeEditor = React.createClass({
       <div ref="cont">
           <Codemirror ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
           <button className='run' type="button" onClick={this.runCode}>run</button>
-          <Result ref="result" value={this.state.result} />
+          <Result ref="result" fresh={this.state.fresh} pieces={this.state.pieces} />
       </div>
     );
 
