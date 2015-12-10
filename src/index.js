@@ -157,14 +157,10 @@ var ResultHist = React.createClass({
 
     vg.parse.spec(vgspec, function(error,chart) {
       var view = chart({renderer: 'svg'}).update();
-
       // // TODO: on right clicking the canvas, download the svg version
       // var $img = $("<img>").attr({src:'data:image/svg+xml;utf8,' +
       //                             view.svg()})
-
-      wait(0,function() {
-        $(ReactDOM.findDOMNode(me)).html(view.svg())
-      })
+      $(ReactDOM.findDOMNode(me)).html(view.svg())
     });
 
     return visEl;
