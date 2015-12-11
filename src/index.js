@@ -65,7 +65,7 @@ var ResultHist = React.createClass({
     var vgspec = {
       "width": 400,
       "height": labels.length * 30,
-      "padding": {"top": 10, "left": 30, "bottom": 20, "right": 30},
+      // "padding": {"top": 10, "left": 30, "bottom": 20, "right": 30},
 
       "data": [
         {
