@@ -204,21 +204,27 @@ var CodeEditor = React.createClass({
 
     var code = this.state.code;
 
+    worker.onerror = function(err) {
+      comp.addResult(<ResultError message={err.message} />)
+      comp.setState({fresh: true})
+      $runButton.html('run').prop('disabled',false);
+    }
+
     worker.onmessage = function(m) {
       var d = m.data;
       console.log('received message')
 
-      if (d.type == 'status') {
+      if (d.type == 'status')
         $runButton.html(d.status)
-      }
 
-      if (d.type == 'text') {
+      if (d.type == 'text')
         comp.addResult(<ResultText message={JSON.stringify(d.obj)} />)
-      }
 
-      if (d.type == 'hist') {
+      if (d.type == 'hist')
         comp.addResult(<ResultHist samples={d.samples} />)
-      }
+
+      if (d.type == 'error')
+        comp.addResult(<ResultError message={d.error.message} />)
 
       if (d.done) {
         $runButton.html('run').prop('disabled',false);
