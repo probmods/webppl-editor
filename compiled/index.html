@@ -61,16 +61,14 @@ print('bar');
 flip(0)</code></pre>
     </div>
   </body>
-  <script src="webppl.js"></script>
   <script src="editor.js"></script>
   <script src="jquery.js"></script>
   <script>
-    installEditor(webppl);
     var storedCode = localStorage.getItem('code');
     if (storedCode) {
     $("pre > code").html(storedCode)
     }
-    $("pre").map(function(i,el) { webppl.editor.code(el); })
-    var worker = new Worker('worker.js');
+    $("pre").map(function(i,el) { wpCodeEditor(el); })
+    //var worker = new Worker('worker.js');
   </script
 </html>

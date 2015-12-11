@@ -1,7 +1,5 @@
 'use strict';
 
-var webppl; // set by exports.install
-
 var React = require('react');
 var ReactDOM = require('react-dom');
 
@@ -9,12 +7,16 @@ var ReactDOM = require('react-dom');
 var Codemirror = require('react-codemirror');
 
 var $ = require('jquery');
-global.$ = $;
 
 global.d3 = require('d3');
 var vl = require('vega-lite');
 var vg = require('vega');
 
+var _ = require('underscore');
+
+var work = require('webworkify');
+
+var jobsQueue = [];
 
 require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
 // NB: require('codemirror/mode/javascript/javascript') doesn't work
@@ -37,16 +39,18 @@ var ResultText = React.createClass({
   }
 });
 
-
-var ResultHist = React.createClass({
+var ResultBarChart = React.createClass({
   render: function() {
-    var samples = this.props.samples;
-    var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
-    var labels = _(frequencyDict).keys();
-    var counts = _(frequencyDict).values();
+    // var samples = this.props.samples;
+    // var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+    // var labels = _(frequencyDict).keys();
+    // var counts = _(frequencyDict).values();
 
-    var frequencyDf = _.zip(labels,counts).map(function(a) {
-      return {label: a[0], count: a[1]}
+    var ivs = this.props.ivs;
+    var dvs = this.props.dvs;
+
+    var frequencyDf = _.zip(ivs,dvs).map(function(a) {
+      return {iv: a[0], dv: a[1]}
     });
 
     // var vlspec = {
@@ -64,7 +68,7 @@ var ResultHist = React.createClass({
     // i can't even get it working on test-vega.html
     var vgspec = {
       "width": 400,
-      "height": labels.length * 30,
+      "height": ivs.length * 30,
       // "padding": {"top": 10, "left": 30, "bottom": 20, "right": 30},
 
       "data": [
@@ -94,9 +98,9 @@ var ResultHist = React.createClass({
 
       "scales": [
         { "name": "yscale", "type": "ordinal", "range": "height",
-          "domain": {"data": "table", "field": "label"} },
+          "domain": {"data": "table", "field": "iv"} },
         { "name": "xscale", "range": "width", "nice": true,
-          "domain": {"data": "table", "field": "count"} }
+          "domain": {"data": "table", "field": "dv"} }
       ],
 
       "axes": [
@@ -111,8 +115,8 @@ var ResultHist = React.createClass({
           "properties": {
             "enter": {
               "x": {"scale": "xscale", value: 0},
-              x2: {scale: 'xscale', field: 'count'},
-              "y": {"scale": "yscale", "field": "label"},
+              x2: {scale: 'xscale', field: 'dv'},
+              "y": {"scale": "yscale", "field": "iv"},
               "height": {"scale": "yscale", "band": true, "offset": -1}
             },
             "update": { "fill": {"value": "steelblue"} },
@@ -128,8 +132,8 @@ var ResultHist = React.createClass({
               "fill": {"value": "#333"}
             },
             "update": {
-              "x": {"scale": "xscale", "signal": "tooltip.count", "offset": 10},
-              "y": {"scale": "yscale", "signal": "tooltip.label", "offset": 3},
+              "x": {"scale": "xscale", "signal": "tooltip.dv", "offset": 10},
+              "y": {"scale": "yscale", "signal": "tooltip.iv", "offset": 3},
               "dy": {"scale": "yscale", "band": true, "mult": 0.5},
               "text": {"signal": "tooltip.count"},
               "fillOpacity": {
@@ -157,7 +161,6 @@ var ResultHist = React.createClass({
 
     vg.parse.spec(vgspec, function(error,chart) {
       var view = chart({renderer: 'svg'}).update();
-      // // TODO: on right clicking the canvas, download the svg version
       var $img = $("<img>").attr({src:'data:image/svg+xml;utf8,' +
                                   view.svg()})
       $(ReactDOM.findDOMNode(me)).append($img);
@@ -185,6 +188,13 @@ var wait = function(ms,f) {
   return setTimeout(f,ms);
 }
 
+// use just a single worker for now since running a lot of
+// workers would be a huge resource hog
+var worker = work(require('./worker.js'));
+
+worker.postMessage({type: 'init',
+                    path: 'http://127.0.0.1:4000/assets/js/webppl.min.js'})
+
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
@@ -204,36 +214,52 @@ var CodeEditor = React.createClass({
 
     var code = this.state.code;
 
-    worker.onerror = function(err) {
-      comp.addResult(<ResultError message={err.message} />)
-      comp.setState({fresh: true})
-      $runButton.html('run').prop('disabled',false);
-    }
+    var job = function() {
 
-    worker.onmessage = function(m) {
-      var d = m.data;
-      console.log('received message')
-
-      if (d.type == 'status')
-        $runButton.html(d.status)
-
-      if (d.type == 'text')
-        comp.addResult(<ResultText message={JSON.stringify(d.obj)} />)
-
-      if (d.type == 'hist')
-        comp.addResult(<ResultHist samples={d.samples} />)
-
-      if (d.type == 'error')
-        comp.addResult(<ResultError message={d.error.message} />)
-
-      if (d.done) {
+      worker.onerror = function(err) {
+        comp.addResult(<ResultError message={err.message} />)
+        comp.setState({fresh: true})
         $runButton.html('run').prop('disabled',false);
-        comp.setState({fresh: true});
       }
-    }
 
-    comp.setState({pieces: []});
-    worker.postMessage(code);
+      worker.onmessage = function(m) {
+        var d = m.data;
+        console.log('received message')
+
+        if (d.type == 'status')
+          $runButton.html(d.status)
+
+        if (d.type == 'text')
+          comp.addResult(<ResultText message={JSON.stringify(d.obj)} />)
+
+        if (d.type == 'barChart')
+          comp.addResult(<ResultBarChart ivs={d.ivs} dvs={d.dvs} />)
+
+        if (d.type == 'error')
+          comp.addResult(<ResultError message={d.error.message} />)
+
+        if (d.done) {
+          $runButton.html('run').prop('disabled',false);
+          comp.setState({fresh: true});
+          jobsQueue.shift();
+
+          if (jobsQueue.length > 0) {
+            (jobsQueue.shift())()
+          }
+        }
+      }
+
+      comp.setState({pieces: []});
+      worker.postMessage(code);
+    };
+
+    jobsQueue.push(job);
+
+    if (jobsQueue.length == 1) {
+      job()
+    } else {
+      $runButton.text('waiting...');
+    }
 
   },
   updateCode: function(newCode) {
@@ -293,10 +319,5 @@ var setupCode = function(preEl) {
 };
 
 
-global.installEditor = function(_webppl) {
-  webppl = _webppl;
-  webppl.editor = {
-    literate: setupLiterate,
-    code: setupCode
-  }
-};
+global.wpCodeEditor = setupCode;
+global.wpLiterateEditor = setupLiterate;
