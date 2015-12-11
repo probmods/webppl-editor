@@ -29,6 +29,7 @@
          background-color: #e0e0e0;
          margin: 0.5em 0 0.5em 0;
          padding: 0.5em 1em;
+         min-width: 100px;
      }
 
      button.run:hover {
@@ -39,8 +40,13 @@
          background-color: #a0a0a0;
      }
 
+     button.run:disabled {
+         cursor: auto;
+     }
+
      #wrapper {
          width: 50%;
+         min-width: 600px;
          margin: 0 auto;
      }
 
@@ -50,10 +56,9 @@
   <body>
     <div id="wrapper">
       <h2>foo</h2>
-      <pre id="foo"><code>var samps = repeat(100,
-                   function() { return uniformDraw(['a','b','c']) })
-
-hist(samps)</code></pre>
+      <pre id="foo"><code>print('foo');
+print('bar');
+flip(0)</code></pre>
     </div>
   </body>
   <script src="webppl.js"></script>
@@ -61,6 +66,11 @@ hist(samps)</code></pre>
   <script src="jquery.js"></script>
   <script>
     installEditor(webppl);
+    var storedCode = localStorage.getItem('code');
+    if (storedCode) {
+    $("pre > code").html(storedCode)
+    }
     $("pre").map(function(i,el) { webppl.editor.code(el); })
+    var worker = new Worker('worker.js');
   </script
 </html>

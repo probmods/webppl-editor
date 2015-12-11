@@ -181,8 +181,6 @@ var Result = React.createClass({
   }
 });
 
-//var hist = function(
-
 var wait = function(ms,f) {
   return setTimeout(f,ms);
 }
@@ -196,44 +194,41 @@ var CodeEditor = React.createClass({
     }
   },
   runCode: function() {
+    var $runButton = $(ReactDOM.findDOMNode(this)).find("button");
+    $runButton.prop('disabled',true);
+
+    global.localStorage.setItem('code',this.state.code);
     this.setState({fresh: false});
 
     var comp = this;
-    var result = this.refs.result;
-
-    global.print = function(s,k,a,x) {
-      comp.addResult(<ResultText message={x} />);
-      return k(s);
-    };
-
-    global.hist = function(s, k, a, samples) {
-      comp.addResult(<ResultHist samples={samples} />);
-      return k(s);
-    }
-
-    // var compiled = webppl.compile(this.props.input.props.value);
-    // console.log(compiled);
 
     var code = this.state.code;
 
-    // pause 30ms so that the stale style is applied
-    // might wanna do this with didComponentUpdate instead
-    // see http://stackoverflow.com/a/28748160/351392
-    wait(30,function() {
-      comp.setState({pieces: []});
-      try {
-        webppl.run(code,
-                   function(s, x) {
-                     comp.addResult(<ResultText message={JSON.stringify(x)} />);
-                     comp.setState({fresh: true});
-                   },
-                   true);
-      } catch(e) {
-        var err = (<ResultError message={e.message} />)
-        comp.addResult(err);
+    worker.onmessage = function(m) {
+      var d = m.data;
+      console.log('received message')
+
+      if (d.type == 'status') {
+        $runButton.html(d.status)
+      }
+
+      if (d.type == 'text') {
+        comp.addResult(<ResultText message={JSON.stringify(d.obj)} />)
+      }
+
+      if (d.type == 'hist') {
+        comp.addResult(<ResultHist samples={d.samples} />)
+      }
+
+      if (d.done) {
+        $runButton.html('run').prop('disabled',false);
         comp.setState({fresh: true});
       }
-    });
+    }
+
+    comp.setState({pieces: []});
+    worker.postMessage(code);
+
   },
   updateCode: function(newCode) {
     this.setState({
@@ -264,11 +259,6 @@ var CodeEditor = React.createClass({
 
   }
 });
-
-// var Result = React.createClass({
-//   getInitialState: function() {
-//     return
-// })
 
 var setupLiterate = function(el) {
 
