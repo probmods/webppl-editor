@@ -175,7 +175,7 @@ var Result = React.createClass({
   render: function() {
     var piecesKeyed = this.props.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
     return (
-      <div className="result">
+      <div className={this.props.newborn ? 'result hide' : 'result'}>
         {piecesKeyed}
       </div>);
   }
@@ -197,7 +197,8 @@ var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
       code: this.props.code,
-      pieces: []
+      pieces: [],
+      newborn: true
     }
   },
   runCode: function() {
@@ -206,10 +207,9 @@ var CodeEditor = React.createClass({
 
     global.localStorage.setItem('code',this.state.code);
 
+    this.setState({newborn: false});
     var comp = this;
-
     var code = this.state.code;
-
     var job = function() {
 
       worker.onerror = function(err) {
@@ -279,7 +279,7 @@ var CodeEditor = React.createClass({
       <div ref="cont">
           <Codemirror ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
           <button className='run' type="button" onClick={this.runCode}>run</button>
-          <Result ref="result" pieces={this.state.pieces} />
+          <Result ref="result" newborn={this.state.newborn} pieces={this.state.pieces} />
       </div>
     );
 
