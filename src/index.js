@@ -172,13 +172,10 @@ var ResultBarChart = React.createClass({
 });
 
 var Result = React.createClass({
-  getClassNames: function() {
-    return this.props.fresh ? 'result' : 'result stale';
-  },
   render: function() {
     var piecesKeyed = this.props.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
     return (
-        <div className={this.getClassNames()}>
+      <div className="result">
         {piecesKeyed}
       </div>);
   }
@@ -193,14 +190,14 @@ var wait = function(ms,f) {
 var worker = work(require('./worker.js'));
 
 worker.postMessage({type: 'init',
+                    // TODO: take this as wpCodeEditor argument
                     path: 'http://127.0.0.1:4000/assets/js/webppl.min.js'})
 
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
       code: this.props.code,
-      pieces: [],
-      fresh: true
+      pieces: []
     }
   },
   runCode: function() {
@@ -208,7 +205,6 @@ var CodeEditor = React.createClass({
     $runButton.prop('disabled',true);
 
     global.localStorage.setItem('code',this.state.code);
-    this.setState({fresh: false});
 
     var comp = this;
 
@@ -218,13 +214,11 @@ var CodeEditor = React.createClass({
 
       worker.onerror = function(err) {
         comp.addResult(<ResultError message={err.message} />)
-        comp.setState({fresh: true})
         $runButton.html('run').prop('disabled',false);
       }
 
       worker.onmessage = function(m) {
         var d = m.data;
-        console.log('received message')
 
         if (d.type == 'status')
           $runButton.html(d.status)
@@ -284,7 +278,7 @@ var CodeEditor = React.createClass({
       <div ref="cont">
           <Codemirror ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
           <button className='run' type="button" onClick={this.runCode}>run</button>
-          <Result ref="result" fresh={this.state.fresh} pieces={this.state.pieces} />
+          <Result ref="result" pieces={this.state.pieces} />
       </div>
     );
 
