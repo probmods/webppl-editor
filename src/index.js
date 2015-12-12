@@ -234,11 +234,12 @@ var CodeEditor = React.createClass({
 
         if (d.done) {
           $runButton.html('run').prop('disabled',false);
-          comp.setState({fresh: true});
+          // remove completed job
           jobsQueue.shift();
 
+          // if there are remaining jobs, start on the next one
           if (jobsQueue.length > 0) {
-            (jobsQueue.shift())()
+            jobsQueue[0]()
           }
         }
       }
