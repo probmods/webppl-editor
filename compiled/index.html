@@ -56,18 +56,23 @@
   <body>
     <div id="wrapper">
       <h2>foo</h2>
-      <pre id="foo"><code>print('foo');
-print('bar');
-flip(0)</code></pre>
+      <pre id="foo"><code>print('start 1');
+hist(repeat(1e5, flip))
+print('end 1')</code></pre>
+
+      <pre id="bar"><code>print('start 2');
+hist(repeat(1e5, flip))
+print('end 2')</code></pre>
+
+    <pre id="baz"><code>print('start 3');
+hist(repeat(1e5, flip))
+print('end 3')</code></pre>
     </div>
+
   </body>
   <script src="editor.js"></script>
   <script src="jquery.js"></script>
   <script>
-    var storedCode = localStorage.getItem('code');
-    if (storedCode) {
-    $("pre > code").html(storedCode)
-    }
     $("pre").map(function(i,el) { wpCodeEditor(el); })
     //var worker = new Worker('worker.js');
   </script
