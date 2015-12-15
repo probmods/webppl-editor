@@ -191,18 +191,31 @@ var wait = function(ms,f) {
 var worker = work(require('./worker.js'));
 
 
+var RunButton = React.createClass({
+  getLabel: function() {
+    var labels = {
+      idle: "run",
+      queued: 'queued...'
+    };
+    return _.has(labels, this.props.status) ? labels[this.props.status] : this.props.status;
+  },
+  render: function() {
+    return (
+        <button className='run' type="button" onClick={this.props.clickHandler} disabled={!(this.props.status == 'idle')}>{this.getLabel()}</button>
+    )
+  }
+});
 
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
       code: this.props.code,
       pieces: [],
-      newborn: true
+      newborn: true,
+      execution: "idle"
     }
   },
   runCode: function() {
-    var $runButton = $(ReactDOM.findDOMNode(this)).find("button");
-    $runButton.prop('disabled',true);
 
     global.localStorage.setItem('code',this.state.code);
 
@@ -210,17 +223,18 @@ var CodeEditor = React.createClass({
     var comp = this;
     var code = this.state.code;
     var job = function() {
+      comp.setState({execution: 'init'});
 
       worker.onerror = function(err) {
         comp.addResult(<ResultError message={err.message} />)
-        $runButton.html('run').prop('disabled',false);
+        comp.setState({execution: 'idle'})
       }
 
       worker.onmessage = function(m) {
         var d = m.data;
 
         if (d.type == 'status')
-          $runButton.html(d.status)
+          comp.setState({execution: d.status})
 
         if (d.type == 'text')
           comp.addResult(<ResultText message={JSON.stringify(d.obj)} />)
@@ -232,7 +246,8 @@ var CodeEditor = React.createClass({
           comp.addResult(<ResultError message={d.error.message} />)
 
         if (d.done) {
-          $runButton.html('run').prop('disabled',false);
+          comp.setState({execution: 'idle'})
+
           // remove completed job
           jobsQueue.shift();
 
@@ -248,11 +263,10 @@ var CodeEditor = React.createClass({
     };
 
     jobsQueue.push(job);
+    this.setState({execution: 'queued'});
 
     if (jobsQueue.length == 1) {
       job()
-    } else {
-      $runButton.text('queued...');
     }
 
   },
@@ -277,7 +291,7 @@ var CodeEditor = React.createClass({
     return (
       <div ref="cont">
           <Codemirror ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
-          <button className='run' type="button" onClick={this.runCode}>run</button>
+          <RunButton status={this.state.execution} clickHandler={this.runCode} />
           <Result ref="result" newborn={this.state.newborn} pieces={this.state.pieces} />
       </div>
     );
