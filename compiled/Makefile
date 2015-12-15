@@ -5,4 +5,4 @@ watch :
 	watchify -v -t [ babelify --presets [ react ] ] ../src/index.js -o editor.js
 
 mirror :
-	rsync -rLv . corn:~/WWW/wp-editor
+	rsync -rLvz . corn:~/WWW/wp-editor
