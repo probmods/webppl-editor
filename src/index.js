@@ -3,16 +3,17 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
 
-// global.CodeMirror = require('codemirror');
 var Codemirror = require('react-codemirror');
+// global.CodeMirror = require('codemirror');
 
 var $ = require('jquery');
 
-global.d3 = require('d3');
+global.d3 = require('d3'); // debugging
 var vl = require('vega-lite');
 var vg = require('vega');
 
 var _ = require('underscore');
+global._ = _; // debugging
 
 var work = require('webworkify');
 
@@ -189,9 +190,7 @@ var wait = function(ms,f) {
 // workers would be a huge resource hog
 var worker = work(require('./worker.js'));
 
-worker.postMessage({type: 'init',
-                    // TODO: take this as wpCodeEditor argument
-                    path: 'http://127.0.0.1:4000/assets/js/webppl.min.js'})
+
 
 var CodeEditor = React.createClass({
   getInitialState: function() {
@@ -313,6 +312,20 @@ var setupCode = function(preEl) {
     })
 };
 
+global.initializeWorker = function(webpplPath) {
+  var isPathRelative = !(/^(?:\/|[a-z]+:\/\/)/.test(webpplPath));
+
+  if (isPathRelative) {
+    var prefix = _.initial(window.location.href.split('/')).join('/')
+
+    webpplPath = [prefix,'/',webpplPath].join('');
+  }
+
+  worker.postMessage({type: 'init',
+                      // TODO: take this as wpCodeEditor argument
+                      path: webpplPath})
+
+}
 
 global.wpCodeEditor = setupCode;
 global.wpLiterateEditor = setupLiterate;
