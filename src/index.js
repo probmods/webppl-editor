@@ -253,7 +253,7 @@ var CodeEditor = React.createClass({
     if (jobsQueue.length == 1) {
       job()
     } else {
-      $runButton.text('waiting...');
+      $runButton.text('queued...');
     }
 
   },
