@@ -225,9 +225,21 @@ var CodeEditor = React.createClass({
     var job = function() {
       comp.setState({execution: 'init'});
 
+      var endJob = function() {
+        comp.setState({execution: 'idle'})
+
+        // remove completed job
+        jobsQueue.shift();
+
+        // if there are remaining jobs, start on the next one
+        if (jobsQueue.length > 0) {
+          jobsQueue[0]()
+        }
+      }
+
       worker.onerror = function(err) {
         comp.addResult(<ResultError message={err.message} />)
-        comp.setState({execution: 'idle'})
+        endJob();
       }
 
       worker.onmessage = function(m) {
@@ -237,24 +249,13 @@ var CodeEditor = React.createClass({
           comp.setState({execution: d.status})
 
         if (d.type == 'text')
-          comp.addResult(<ResultText message={JSON.stringify(d.obj)} />)
+          comp.addResult(<ResultText message={d.obj} />)
 
         if (d.type == 'barChart')
           comp.addResult(<ResultBarChart ivs={d.ivs} dvs={d.dvs} />)
 
-        if (d.type == 'error')
-          comp.addResult(<ResultError message={d.error.message} />)
-
         if (d.done) {
-          comp.setState({execution: 'idle'})
-
-          // remove completed job
-          jobsQueue.shift();
-
-          // if there are remaining jobs, start on the next one
-          if (jobsQueue.length > 0) {
-            jobsQueue[0]()
-          }
+          endJob();
         }
       }
 
