@@ -14,7 +14,7 @@ module.exports = function(self) {
     }
 
     postMessage({type: 'status', status: 'compiling...'})
-    var compiledCode = webppl.compile(data);
+    var compiledCode = webppl.compile(data, 'verbose');
 
     var k = function(s,x) {
       postMessage({type: 'text',
