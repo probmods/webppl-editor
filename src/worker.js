@@ -5,16 +5,24 @@ module.exports = function(self) {
   // and then doing require('webppl') here
   // importScripts('webppl.js');
 
+  var compileCache = {};
+
   self.onmessage = function(evt) {
     var data = evt.data;
 
     if (typeof data == 'object' || data.type == 'init') {
       importScripts(data.path);
-      return
+      return;
     }
 
-    postMessage({type: 'status', status: 'compiling...'})
-    var compiledCode = webppl.compile(data, 'verbose');
+    // cache results of code compilation
+    // TODO: cache eviction? hashing keys?
+    if (!compileCache[data]) {
+      postMessage({type: 'status', status: 'compiling...'})
+      compileCache[data] = webppl.compile(data, 'verbose');
+    }
+
+    var compiledCode = compileCache[data];
 
     var k = function(s,x) {
       postMessage({type: 'text',
