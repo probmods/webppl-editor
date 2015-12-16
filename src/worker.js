@@ -1,5 +1,20 @@
 var _ = require('underscore');
 
+var serializeReturnValue = function(x) {
+  if (x && (x.score != undefined) && (x.sample != undefined))
+    return '<erp>';
+
+  if (typeof x == 'function')
+    return '<function ' + x.name + '>';
+
+  if (typeof x == 'string') {
+    return x;
+  }
+
+  return x;
+};
+
+
 module.exports = function(self) {
   // with this approach, could try including webppl as a dependency
   // and then doing require('webppl') here
@@ -24,10 +39,11 @@ module.exports = function(self) {
 
     var compiledCode = compileCache[data];
 
+    // after webppl finishes, inform the main thread
     var k = function(s,x) {
       postMessage({type: 'text',
                    done: true,
-                   obj: x});
+                   obj: serializeReturnValue(x)});
     }
 
     postMessage({type: 'status', status: 'running...'})
