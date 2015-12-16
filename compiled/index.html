@@ -2,6 +2,7 @@
   <head>
     <meta charset="UTF-8">
     <link rel='stylesheet' type='text/css' href='codemirror-5.8.0.css'>
+    <!-- -TODO: move most of this to editor.css but wrap it all in a .webppl class -->
     <style>
      body {
          font-family: Menlo
@@ -49,6 +50,16 @@
          min-width: 600px;
          margin: 0 auto;
      }
+
+     div.CodeMirror span.CodeMirror-matchingbracket {
+         background-color: #e0e0e0;
+     }
+
+     div.CodeMirror span.CodeMirror-nonmatchingbracket {
+         color: black;
+         background-color: #ECAAB9;
+     }
+
 
     </style>
     <link rel='stylesheet' type='text/css' href='editor.css'>

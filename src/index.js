@@ -19,7 +19,9 @@ var work = require('webworkify');
 
 var jobsQueue = [];
 
+require('react-codemirror/node_modules/codemirror/addon/edit/matchbrackets')
 require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
+
 // NB: require('codemirror/mode/javascript/javascript') doesn't work
 // might be able to avoid reaching into react-codemirror's copy of codemirror
 // by doing some browserify tricks with -x or -r or factor-bundle (TODO: investigate)
