@@ -308,22 +308,22 @@ var setupCode = function(preEl) {
   // converts <pre><code>...</code></pre>
   // to a CodeMirror instance
 
+  var parentDiv = preEl.parentNode;
+
   var editorDiv = document.createElement('div');
 
   var r = React.createElement(CodeEditor,
                               {code: preEl.children[0].innerHTML })
 
-    ReactDOM.render(r, editorDiv, function() {
-      var cm = this.refs.editor.codeMirror;
-      requestAnimationFrame(function() {
-        $(preEl).replaceWith(editorDiv);
-        cm.refresh();
-        // $(cm.display.wrapper).after(
-        //   $('<button>').attr('type', 'button').addClass('run').text('run')
-        // )
 
-      })
+
+  ReactDOM.render(r, editorDiv, function() {
+    var cm = this.refs.editor.codeMirror;
+    requestAnimationFrame(function() {
+      parentDiv.replaceChild(editorDiv, preEl);
+      cm.refresh();
     })
+  })
 };
 
 global.initializeWorker = function(webpplPath) {
