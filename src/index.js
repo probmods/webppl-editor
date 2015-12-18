@@ -14,7 +14,7 @@ var CM = require('react-codemirror/node_modules/codemirror');
 var $ = require('jquery');
 
 global.d3 = require('d3'); // debugging
-var vl = require('vega-lite');
+//var vl = require('vega-lite');
 var vg = require('vega');
 
 var _ = require('underscore');
