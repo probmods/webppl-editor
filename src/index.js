@@ -17,6 +17,22 @@ global.d3 = require('d3'); // debugging
 //var vl = require('vega-lite');
 var vg = require('vega');
 
+// NB: redundant with worker.js
+var serializeReturnValue = function(x) {
+  if (x && (x.score != undefined) && (x.sample != undefined))
+    return '<erp>';
+
+  if (typeof x == 'function')
+    return '<function ' + x.name + '>';
+
+  if (typeof x == 'string') {
+    return x;
+  }
+
+  return x;
+};
+
+
 var _ = require('underscore');
 global._ = _; // debugging
 
@@ -231,6 +247,19 @@ var CodeEditor = React.createClass({
     this.setState({newborn: false});
     var comp = this;
     var code = this.state.code;
+
+    if (this.props.language == 'javascript') {
+      // run in main thread because i expect we won't
+      // do much heavy lifting with just js
+      try {
+        var result = eval.call(global, this.state.code);
+        comp.addResult(<ResultText message={serializeReturnValue(result)}/>)
+      } catch (err) {
+        comp.addResult(<ResultError message={err.message}/>)
+      }
+      return;
+    }
+
     var job = function() {
       comp.setState({execution: 'init'});
 
@@ -330,9 +359,8 @@ var setupCode = function(preEl) {
   var editorDiv = document.createElement('div');
 
   var r = React.createElement(CodeEditor,
-                              {code: preEl.children[0].innerHTML })
-
-
+                              {code: preEl.children[0].innerHTML,
+                               language: 'javascript'});
 
   ReactDOM.render(r, editorDiv, function() {
     var cm = this.refs.editor.codeMirror;
