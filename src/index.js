@@ -359,8 +359,7 @@ var setupCode = function(preEl) {
   var editorDiv = document.createElement('div');
 
   var r = React.createElement(CodeEditor,
-                              {code: preEl.children[0].innerHTML,
-                               language: 'javascript'});
+                              {code: preEl.children[0].innerHTML});
 
   ReactDOM.render(r, editorDiv, function() {
     var cm = this.refs.editor.codeMirror;
