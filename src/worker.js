@@ -23,21 +23,33 @@ module.exports = function(self) {
   var compileCache = {};
 
   self.onmessage = function(evt) {
-    var data = evt.data;
+    // let's call the event data the attachment
+    var attachment = evt.data;
 
-    if (typeof data == 'object' || data.type == 'init') {
-      importScripts(data.path);
+    if (typeof attachment == 'object' && attachment.type == 'init') {
+      importScripts(attachment.path);
+      return;
+    }
+
+    var code = attachment.code;
+
+    if (attachment.language == 'javascript') {
+      postMessage({type: 'status', status: 'running...'})
+      var jsReturnValue = eval(code);
+      postMessage({type: 'text',
+                   done: true,
+                   obj: serializeReturnValue(jsReturnValue) })
       return;
     }
 
     // cache results of code compilation
     // TODO: cache eviction? hashing keys?
-    if (!compileCache[data]) {
+    if (!compileCache[code]) {
       postMessage({type: 'status', status: 'compiling...'})
-      compileCache[data] = webppl.compile(data, 'verbose');
+      compileCache[code] = webppl.compile(code, 'verbose');
     }
 
-    var compiledCode = compileCache[data];
+    var compiledCode = compileCache[code];
 
     // after webppl finishes, inform the main thread
     var k = function(s,x) {

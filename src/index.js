@@ -247,18 +247,7 @@ var CodeEditor = React.createClass({
     this.setState({newborn: false});
     var comp = this;
     var code = this.state.code;
-
-    if (this.props.language == 'javascript') {
-      // run in main thread because i expect we won't
-      // do much heavy lifting with just js
-      try {
-        var result = eval.call(global, this.state.code);
-        comp.addResult(<ResultText message={serializeReturnValue(result)}/>)
-      } catch (err) {
-        comp.addResult(<ResultError message={err.message}/>)
-      }
-      return;
-    }
+    var language = this.props.language;
 
     var job = function() {
       comp.setState({execution: 'init'});
@@ -298,7 +287,8 @@ var CodeEditor = React.createClass({
       }
 
       comp.setState({pieces: []});
-      worker.postMessage(code);
+      worker.postMessage({language: language,
+                          code: code});
     };
 
     jobsQueue.push(job);
@@ -350,7 +340,7 @@ var setupLiterate = function(el) {
 
 };
 
-var setupCode = function(preEl) {
+var setupCode = function(preEl, options) {
   // converts <pre><code>...</code></pre>
   // to a CodeMirror instance
 
@@ -359,7 +349,9 @@ var setupCode = function(preEl) {
   var editorDiv = document.createElement('div');
 
   var r = React.createElement(CodeEditor,
-                              {code: preEl.children[0].innerHTML});
+                              {code: preEl.children[0].innerHTML,
+                               language: options.language
+                              });
 
   ReactDOM.render(r, editorDiv, function() {
     var cm = this.refs.editor.codeMirror;

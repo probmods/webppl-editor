@@ -86,6 +86,6 @@ print('end 3')</code></pre>
   <script>
     // initializeWorker('webppl.js'); // works with relative path
     initializeWorker('http://dippl.org/assets/js/webppl.min.js'); // works with absolute path too
-    $("pre").map(function(i,el) { wpCodeEditor(el); })
+    $("pre").map(function(i,el) { wpCodeEditor(el, {language: 'webppl'}); })
   </script
 </html>
