@@ -20,3 +20,15 @@ pre.error {
 .hide {
     display: none
 }
+
+.CodeMirror-foldmarker {
+    background-color: #ffffcc;
+    border: 1px solid gray;
+    border-radius: 4px;
+    display: inline;
+    padding: 0 0.5em
+}
+
+.CodeMirror-foldmarker:hover {
+    cursor: pointer
+}

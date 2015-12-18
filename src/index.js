@@ -3,7 +3,12 @@
 var React = require('react');
 var ReactDOM = require('react-dom');
 
-var Codemirror = require('react-codemirror');
+var CodeMirrorComponent = require('react-codemirror');
+
+// get access to the private CM function inside react-codemirror
+// this works because node require calls are cached
+var CM = require('react-codemirror/node_modules/codemirror');
+
 // global.CodeMirror = require('codemirror');
 
 var $ = require('jquery');
@@ -286,19 +291,23 @@ var CodeEditor = React.createClass({
     });
   },
   render: function() {
+    var myRangeFinder = require('./folding').myRangeFinder;
+
     var options = {
       mode: 'javascript',
       lineNumbers: false,
       matchBrackets: true,
       viewportMargin: Infinity,
       extraKeys: {
-        "Cmd-/": "toggleComment"
+        "Cmd-/": "toggleComment",
+        "Cmd-.": function(cm){cm.foldCode(cm.getCursor(), myRangeFinder); }
+
       }
     };
 
     return (
       <div ref="cont">
-          <Codemirror ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
+          <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
           <RunButton status={this.state.execution} clickHandler={this.runCode} />
           <Result ref="result" newborn={this.state.newborn} pieces={this.state.pieces} />
       </div>
