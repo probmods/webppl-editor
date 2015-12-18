@@ -21,6 +21,9 @@ var jobsQueue = [];
 
 require('react-codemirror/node_modules/codemirror/addon/edit/matchbrackets')
 require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
+// installs toggleComment
+require('react-codemirror/node_modules/codemirror/addon/comment/comment');
+
 
 // NB: require('codemirror/mode/javascript/javascript') doesn't work
 // might be able to avoid reaching into react-codemirror's copy of codemirror
@@ -192,7 +195,6 @@ var wait = function(ms,f) {
 // workers would be a huge resource hog
 var worker = work(require('./worker.js'));
 
-
 var RunButton = React.createClass({
   getLabel: function() {
     var labels = {
@@ -288,7 +290,10 @@ var CodeEditor = React.createClass({
       mode: 'javascript',
       lineNumbers: false,
       matchBrackets: true,
-      viewportMargin: Infinity
+      viewportMargin: Infinity,
+      extraKeys: {
+        "Cmd-/": "toggleComment"
+      }
     };
 
     return (
