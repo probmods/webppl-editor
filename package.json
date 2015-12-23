@@ -9,6 +9,7 @@
     "babelify": "^7.2.0",
     "d3": "^3.5.10",
     "jquery": "^2.1.4",
+    "paper": "^0.9.25",
     "react": "^0.14.3",
     "react-codemirror": "^0.2.2",
     "react-dom": "^0.14.3",

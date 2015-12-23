@@ -2,6 +2,7 @@
 
 var React = require('react');
 var ReactDOM = require('react-dom');
+var Paper = require('paper');
 
 var CodeMirrorComponent = require('react-codemirror');
 
@@ -198,6 +199,35 @@ var ResultBarChart = React.createClass({
   }
 });
 
+var PaperComponent = React.createClass({
+  newPoint: function(x,y) {
+    return new this.paper.Point(x, y);
+  },
+  newPath: function(strokeWidth, opacity, color){
+    var path = new this.paper.Path();
+    path.strokeColor = color || 'black';
+    path.strokeWidth = strokeWidth || 8;
+    path.opacity = opacity || 0.6;
+    return path;
+  },
+  line: function(x1, y1, x2, y2, strokeWidth, opacity, color) {
+    var path = this.newPath(strokeWidth, opacity, color);
+    path.moveTo(x1, y1);
+    path.lineTo(this.newPoint(x2, y2));
+    this.paper.view.draw();
+  },
+  componentDidMount: function() {
+    var paper = new Paper.PaperScope();
+    paper.setup(ReactDOM.findDOMNode(this));
+    paper.view.viewSize = new paper.Size(this.props.width,this.props.height);
+    paper.view.draw();
+    this.paper = paper;
+  },
+  render: function() {
+    return (<canvas ref={this.props.canvasId} className="paper" width={this.props.width} height={this.props.height} />)
+  }
+});
+
 var Result = React.createClass({
   render: function() {
     var piecesKeyed = this.props.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
@@ -231,6 +261,8 @@ var RunButton = React.createClass({
   }
 });
 
+var paperComponents = {};
+
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
@@ -248,6 +280,8 @@ var CodeEditor = React.createClass({
     var comp = this;
     var code = this.state.code;
     var language = this.props.language;
+
+    var drawObjects = {};
 
     var job = function() {
       comp.setState({execution: 'init'});
@@ -280,6 +314,43 @@ var CodeEditor = React.createClass({
 
         if (d.type == 'barChart')
           comp.addResult(<ResultBarChart ivs={d.ivs} dvs={d.dvs} />)
+
+        // TODO: enable custom handlers to be defined elsewhere?
+        if (d.type == 'draw') {
+          // PaperComponent attempt
+          if (d.command == 'init') {
+            var paperComponent = (<PaperComponent width={d.width} height={d.height} visible={d.visible} canvasId={d.canvasId} />)
+
+            paperComponents[d.canvasId] = paperComponent;
+            comp.addResult(paperComponent)
+          }
+          if (d.command == 'line') {
+            // ------- TODO: this doesn't work
+            // paperComponent is a ReactElement, not a component?
+            var paperComponent = comp.refs[d.canvasId];
+            debugger;
+            paperComponent.line(d.x1,d.y1,d.x2,d.y2,d.strokeWidth,d.opacity,d.color);
+          }
+
+
+          // if (d.command == 'init') {
+
+          //   var drawObject = new DrawObject(d.width, d.height, d.visible);
+
+          //   if (d.visible) {
+          //     $(ReactDOM.findDOMNode(comp)).find(".result").append(drawObject.canvas);
+          //   }
+
+          //   drawObjects[d.canvasId] = drawObject;
+          // }
+
+          // if (d.command == 'line') {
+          //   var drawObject = drawObjects[d.canvasId];
+
+          //   drawObject.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color);
+          // }
+
+        }
 
         if (d.done) {
           endJob();
@@ -324,6 +395,8 @@ var CodeEditor = React.createClass({
       }
     };
 
+    // TODO: get rid of Result ref
+    // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     return (
       <div ref="cont">
           <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
@@ -362,18 +435,26 @@ var setupCode = function(preEl, options) {
   })
 };
 
+var makeAbsolutePath = function(relativePath) {
+  var prefix = _.initial(window.location.href.split('/')).join('/');
+  return [prefix,'/',relativePath].join('');
+}
+
+var isPathRelative = function(path) {
+  return !(/^(?:\/|[a-z]+:\/\/)/.test(path))
+}
+
 global.initializeWorker = function(webpplPath) {
-  var isPathRelative = !(/^(?:\/|[a-z]+:\/\/)/.test(webpplPath));
-
-  if (isPathRelative) {
-    var prefix = _.initial(window.location.href.split('/')).join('/')
-
-    webpplPath = [prefix,'/',webpplPath].join('');
+  if (isPathRelative(webpplPath)) {
+    webpplPath = makeAbsolutePath(webpplPath);
   }
 
   worker.postMessage({type: 'init',
                       // TODO: take this as wpCodeEditor argument
                       path: webpplPath})
+
+  worker.postMessage({type: 'init',
+                      path: makeAbsolutePath('../src/draw.js')})
 
 }
 
