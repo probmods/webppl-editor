@@ -376,6 +376,9 @@ var CodeEditor = React.createClass({
     })
   },
   addResult: function(result) {
+    // discovered alternate form of setState on my own
+    // but later stumbled on a good explanation of why we need it at
+    // https://kevinmccarthy.org/2015/07/05/multiple-async-callbacks-updating-state-in-react/
     this.setState(function(state, props) {
       return {pieces: state.pieces.concat(result)}
     });
