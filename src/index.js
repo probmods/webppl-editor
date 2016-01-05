@@ -206,57 +206,51 @@ var PaperComponent = React.createClass({
     paper.view.draw();
     this.paper = paper;
   },
-  redraw: function() {
-    this.paper.view.draw()
-  },
   circle: function(x, y, radius, stroke, fill) {
-    var point = this.newPoint(x, y);
+    console.log(' circle called ')
+
+    var point = new this.paper.Point(x, y);
     var circle = new this.paper.Path.Circle(point, radius || 50);
     circle.fillColor = fill || 'black';
     circle.strokeColor = stroke || 'black';
-    this.redraw();
+    circle.opacity = 0.1; // TODO: remove me
+    this.paper.view.draw();
   },
-  newPoint: function(x,y) {
-    return new this.paper.Point(x, y);
-  },
-  newPath: function(strokeWidth, opacity, color){
+  line: function(x1, y1, x2, y2, strokeWidth, opacity, color) {
     var path = new this.paper.Path();
     path.strokeColor = color || 'black';
     path.strokeWidth = strokeWidth || 8;
     path.opacity = opacity || 0.6;
-    return path;
-  },
-  line: function(x1, y1, x2, y2, strokeWidth, opacity, color) {
-    var path = this.newPath(strokeWidth, opacity, color);
     path.moveTo(x1, y1);
     path.lineTo(this.newPoint(x2, y2));
-    this.redraw()
+    this.paper.view.draw();
   },
   polygon: function(x, y, n, radius, stroke, fill){
-    var point = this.newPoint(x, y);
+    var point = new this.paper.Point(x, y);
     var polygon = new this.paper.Path.RegularPolygon(point, n, radius || 20);
     polygon.fillColor = fill || 'white';
     polygon.strokeColor = stroke || 'black';
     polygon.strokeWidth = 4;
-    this.redraw();
+    this.paper.view.draw();
   }
 });
 
 var Result = React.createClass({
+  // append only
+  shouldComponentUpdate: function(nextProps, nextState) {
+    return nextProps.pieces.length > this.props.pieces.length;
+  },
   render: function() {
     var comp = this;
 
     var renderPiece = function(d,k) {
-      if (d.type == 'text')
+      if (d.type == 'text') {
         return <ResultText key={k} message={d.obj} />
-
-      if (d.type == 'error')
+      } else if (d.type == 'error') {
         return <ResultError key={k} message={d.message} />
-
-      if (d.type == 'barChart')
+      } else if (d.type == 'barChart') {
         return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
-
-      if (d.type == 'draw') {
+      } else if (d.type == 'draw') {
         if (d.command == 'init')
           return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} />)
 
@@ -265,14 +259,19 @@ var Result = React.createClass({
         // TODO: there is redundancy between these calls and PaperComponent method signatures.
         // refactor DrawObject prototype methods in src/draw.js so i can just pass a dictionary from here
         // to PaperComponent methods
-        if (d.command == 'line')
+        if (d.command == 'line') {
           paperComponent.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color)
-
-        if (d.command == 'polygon')
-            paperComponent.polygon(d.x, d.y, d.n, d.radius, d.stroke, d.fill)
+        } else if (d.command == 'polygon') {
+          paperComponent.polygon(d.x, d.y, d.n, d.radius, d.stroke, d.fill)
+        } else if (d.command == 'circle') {
+          paperComponent.circle(d.x, d.y, d.radius, d.stroke, d.fill)
+        } else {
+          console.log('unrouted paper command: ', d)
+        }
+      } else {
+        console.log('unrouted command: ', d)
       }
 
-      console.log('unrouted result', d)
     };
 
     var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) })

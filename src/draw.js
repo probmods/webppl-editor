@@ -14,6 +14,15 @@ function DrawObject(width, height, visible){
 }
 
 DrawObject.prototype.circle = function(x, y, radius, stroke, fill){
+  postMessage({type: 'draw',
+               command: 'circle',
+               canvasId: this.canvasId,
+               x: x,
+               y: y,
+               radius: radius,
+               stroke: stroke,
+               fill: fill
+              })
 };
 
 DrawObject.prototype.polygon = function(x, y, n, radius, stroke, fill){
@@ -48,6 +57,10 @@ DrawObject.prototype.redraw = function(){
 };
 
 DrawObject.prototype.toArray = function(){
+  postMessage({type: 'draw',
+               command: 'toArray',
+               canvasId: this.canvasId
+              })
 };
 
 DrawObject.prototype.distanceF = function(f, cmpDrawObject){
