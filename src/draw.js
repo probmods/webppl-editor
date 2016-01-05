@@ -17,6 +17,16 @@ DrawObject.prototype.circle = function(x, y, radius, stroke, fill){
 };
 
 DrawObject.prototype.polygon = function(x, y, n, radius, stroke, fill){
+  postMessage({type: 'draw',
+               command: 'polygon',
+               canvasId: this.canvasId,
+               x: x,
+               y: y,
+               n: n,
+               radius: radius,
+               stroke: stroke,
+               fill: fill
+              })
 };
 
 DrawObject.prototype.line = function(x1, y1, x2, y2, strokeWidth, opacity, color){

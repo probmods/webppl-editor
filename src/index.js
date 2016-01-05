@@ -6,6 +6,8 @@ var Paper = require('paper');
 
 var CodeMirrorComponent = require('react-codemirror');
 
+
+
 // get access to the private CM function inside react-codemirror
 // this works because node require calls are cached
 var CM = require('react-codemirror/node_modules/codemirror');
@@ -52,6 +54,9 @@ require('react-codemirror/node_modules/codemirror/addon/comment/comment');
 // by doing some browserify tricks with -x or -r or factor-bundle (TODO: investigate)
 
 var ResultError = React.createClass({
+  shouldComponentUpdate: function() {
+    return false
+  },
   render: function() {
     return (
         <pre key={this.props.key} className='error'>{this.props.message}</pre>
@@ -60,7 +65,11 @@ var ResultError = React.createClass({
 });
 
 var ResultText = React.createClass({
+  shouldComponentUpdate: function() {
+    return false
+  },
   render: function() {
+    console.log('text renderer called')
     return (
         <pre key={this.props.key} className='text'>{this.props.message}</pre>
     );
@@ -68,29 +77,17 @@ var ResultText = React.createClass({
 });
 
 var ResultBarChart = React.createClass({
-  render: function() {
-    // var samples = this.props.samples;
-    // var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
-    // var labels = _(frequencyDict).keys();
-    // var counts = _(frequencyDict).values();
-
+  shouldComponentUpdate: function(props, state) {
+    // TODO? is this too strong?
+    return false
+  },
+  componentDidMount: function() {
     var ivs = this.props.ivs;
     var dvs = this.props.dvs;
 
     var frequencyDf = _.zip(ivs,dvs).map(function(a) {
       return {iv: a[0], dv: a[1]}
     });
-
-    // var vlspec = {
-    //   data: {values: frequencyDf},
-    //   marktype: "bar",
-    //   encoding: {
-    //     x: {type: "O", name: "label"},
-    //     y: {type: "Q", name: "count"}
-    //   }
-    // };
-
-    // var vgspec = vl.compile(vlspec);
 
     // TODO: why did the hovering stuff stop working all of a sudden?
     // i can't even get it working on test-vega.html
@@ -180,26 +177,43 @@ var ResultBarChart = React.createClass({
       ]
     };
 
-    var visEl = (
-        <div>
-        </div>
-    );
-
-    var me = this;
+    var div = this.refs.div;
 
     vg.parse.spec(vgspec, function(error,chart) {
       var view = chart({renderer: 'svg'}).update();
-      var $img = $("<img>").attr({src:'data:image/svg+xml;utf8,' +
-                                  view.svg()})
-      $(ReactDOM.findDOMNode(me)).append($img);
+      var img = document.createElement('img');
+      img.src = 'data:image/svg+xml;utf8,' + view.svg();
+      ReactDOM.findDOMNode(div).innerHTML = "<img src='data:image/svg+xml;utf8," + view.svg() + "'></img>";
     });
 
-    return visEl;
-
+  },
+  render: function() {
+    return (<div ref="div" />);
   }
 });
 
 var PaperComponent = React.createClass({
+  // TODO: use the hidden prop
+  render: function() {
+    return (<canvas className="paper" width={this.props.width} height={this.props.height} />)
+  },
+  componentDidMount: function() {
+    var paper = new Paper.PaperScope();
+    paper.setup(ReactDOM.findDOMNode(this));
+    paper.view.viewSize = new paper.Size(this.props.width,this.props.height);
+    paper.view.draw();
+    this.paper = paper;
+  },
+  redraw: function() {
+    this.paper.view.draw()
+  },
+  circle: function(x, y, radius, stroke, fill) {
+    var point = this.newPoint(x, y);
+    var circle = new this.paper.Path.Circle(point, radius || 50);
+    circle.fillColor = fill || 'black';
+    circle.strokeColor = stroke || 'black';
+    this.redraw();
+  },
   newPoint: function(x,y) {
     return new this.paper.Point(x, y);
   },
@@ -214,23 +228,44 @@ var PaperComponent = React.createClass({
     var path = this.newPath(strokeWidth, opacity, color);
     path.moveTo(x1, y1);
     path.lineTo(this.newPoint(x2, y2));
-    this.paper.view.draw();
+    this.redraw()
   },
-  componentDidMount: function() {
-    var paper = new Paper.PaperScope();
-    paper.setup(ReactDOM.findDOMNode(this));
-    paper.view.viewSize = new paper.Size(this.props.width,this.props.height);
-    paper.view.draw();
-    this.paper = paper;
+  polygon: function(x, y, n, radius, stroke, fill){
+    var point = this.newPoint(x, y);
+    var polygon = new this.paper.Path.RegularPolygon(point, n, radius || 20);
+    polygon.fillColor = fill || 'white';
+    polygon.strokeColor = stroke || 'black';
+    polygon.strokeWidth = 4;
+    this.redraw();
   },
-  render: function() {
-    return (<canvas ref={this.props.canvasId} className="paper" width={this.props.width} height={this.props.height} />)
-  }
+
 });
+
 
 var Result = React.createClass({
   render: function() {
-    var piecesKeyed = this.props.pieces.map(function(x,i) { return (<div key={i}>{x}</div>) });
+    var comp = this;
+
+    var renderPiece = function(d,k) {
+      if (d.type == 'text') {
+        return <ResultText key={k} message={d.obj} />
+      } else if (d.type == 'barChart') {
+        return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
+      } else if (d.type == 'draw') {
+        if (d.command == 'init') {
+          return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} />)
+        } else {
+          var paperComponent = comp.refs[d.canvasId];
+          if (d.command == 'line') {
+            paperComponent.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color)
+          } else if (d.command == 'polygon') {
+            paperComponent.polygon(d.x, d.y, d.n, d.radius, d.stroke, d.fill)
+          }
+        }
+      }
+    };
+
+    var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) })
     return (
       <div className={this.props.newborn ? 'result hide' : 'result'}>
         {piecesKeyed}
@@ -306,56 +341,20 @@ var CodeEditor = React.createClass({
       worker.onmessage = function(m) {
         var d = m.data;
 
-        if (d.type == 'status')
+        if (d.type == 'status') {
           comp.setState({execution: d.status})
-
-        if (d.type == 'text')
-          comp.addResult(<ResultText message={d.obj} />)
-
-        if (d.type == 'barChart')
-          comp.addResult(<ResultBarChart ivs={d.ivs} dvs={d.dvs} />)
-
-        // TODO: enable custom handlers to be defined elsewhere?
-        if (d.type == 'draw') {
-          // PaperComponent attempt
-          if (d.command == 'init') {
-            var paperComponent = (<PaperComponent width={d.width} height={d.height} visible={d.visible} canvasId={d.canvasId} />)
-
-            paperComponents[d.canvasId] = paperComponent;
-            comp.addResult(paperComponent)
-          }
-          if (d.command == 'line') {
-            // ------- TODO: this doesn't work
-            // paperComponent is a ReactElement, not a component?
-            var paperComponent = comp.refs[d.canvasId];
-            debugger;
-            paperComponent.line(d.x1,d.y1,d.x2,d.y2,d.strokeWidth,d.opacity,d.color);
-          }
-
-
-          // if (d.command == 'init') {
-
-          //   var drawObject = new DrawObject(d.width, d.height, d.visible);
-
-          //   if (d.visible) {
-          //     $(ReactDOM.findDOMNode(comp)).find(".result").append(drawObject.canvas);
-          //   }
-
-          //   drawObjects[d.canvasId] = drawObject;
-          // }
-
-          // if (d.command == 'line') {
-          //   var drawObject = drawObjects[d.canvasId];
-
-          //   drawObject.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color);
-          // }
-
+        } else {
+          // this ends up passing lightweight data to Results
+          // so we can set refs there for draw objects
+          // (refs must be set inside render)
+          comp.addResult(m.data)
         }
 
         if (d.done) {
           endJob();
         }
       }
+
 
       comp.setState({pieces: []});
       worker.postMessage({language: language,
@@ -368,7 +367,6 @@ var CodeEditor = React.createClass({
     if (jobsQueue.length == 1) {
       job()
     }
-
   },
   updateCode: function(newCode) {
     this.setState({
