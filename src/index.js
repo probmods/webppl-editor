@@ -77,10 +77,12 @@ var ResultText = React.createClass({
 });
 
 var ResultBarChart = React.createClass({
-  shouldComponentUpdate: function(props, state) {
-    // TODO? is this too strong?
-    return false
-  },
+  // // render is called any time new results are entered or the codebox is edited
+  // // we can do a lightweight version of PureRenderMixin by just return false
+  // // here. see also http://stackoverflow.com/a/24719289/351392
+  // shouldComponentUpdate: function(nextProps, nextState) {
+  //   return false
+  // },
   componentDidMount: function() {
     var ivs = this.props.ivs;
     var dvs = this.props.dvs;
@@ -283,6 +285,8 @@ var Result = React.createClass({
 
 var wait = function(ms,f) {
   return setTimeout(f,ms);
+    // TODO: in general, numeric index based keys aren't recommended
+    // but they might work for our use case (essentially append-only)
 }
 
 // use just a single worker for now since running a lot of
