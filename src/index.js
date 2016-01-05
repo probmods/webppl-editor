@@ -237,32 +237,40 @@ var PaperComponent = React.createClass({
     polygon.strokeColor = stroke || 'black';
     polygon.strokeWidth = 4;
     this.redraw();
-  },
-
+  }
 });
-
 
 var Result = React.createClass({
   render: function() {
     var comp = this;
 
     var renderPiece = function(d,k) {
-      if (d.type == 'text') {
+      if (d.type == 'text')
         return <ResultText key={k} message={d.obj} />
-      } else if (d.type == 'barChart') {
+
+      if (d.type == 'error')
+        return <ResultError key={k} message={d.message} />
+
+      if (d.type == 'barChart')
         return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
-      } else if (d.type == 'draw') {
-        if (d.command == 'init') {
+
+      if (d.type == 'draw') {
+        if (d.command == 'init')
           return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} />)
-        } else {
-          var paperComponent = comp.refs[d.canvasId];
-          if (d.command == 'line') {
-            paperComponent.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color)
-          } else if (d.command == 'polygon') {
+
+        var paperComponent = comp.refs[d.canvasId];
+
+        // TODO: there is redundancy between these calls and PaperComponent method signatures.
+        // refactor DrawObject prototype methods in src/draw.js so i can just pass a dictionary from here
+        // to PaperComponent methods
+        if (d.command == 'line')
+          paperComponent.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color)
+
+        if (d.command == 'polygon')
             paperComponent.polygon(d.x, d.y, d.n, d.radius, d.stroke, d.fill)
-          }
-        }
       }
+
+      console.log('unrouted result', d)
     };
 
     var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) })
@@ -334,7 +342,9 @@ var CodeEditor = React.createClass({
       }
 
       worker.onerror = function(err) {
-        comp.addResult(<ResultError message={err.message} />)
+        // get stack information from worker.js by wrapping eval call in a try-catch, then
+        // pass it here
+        comp.addResult({type: 'error', message: err.message});
         endJob();
       }
 
@@ -354,7 +364,6 @@ var CodeEditor = React.createClass({
           endJob();
         }
       }
-
 
       comp.setState({pieces: []});
       worker.postMessage({language: language,
