@@ -395,13 +395,12 @@ var CodeEditor = React.createClass({
       }
     };
 
-    // TODO: get rid of Result ref
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     return (
       <div ref="cont">
           <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
           <RunButton status={this.state.execution} clickHandler={this.runCode} />
-          <Result ref="result" newborn={this.state.newborn} pieces={this.state.pieces} />
+          <Result newborn={this.state.newborn} pieces={this.state.pieces} />
       </div>
     );
 
