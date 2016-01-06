@@ -238,7 +238,7 @@ var PaperComponent = React.createClass({
 var Result = React.createClass({
   // append only
   shouldComponentUpdate: function(nextProps, nextState) {
-    return nextProps.pieces.length > this.props.pieces.length;
+    return !(_.isEqual(nextProps.pieces, this.props.pieces));
   },
   render: function() {
     var comp = this;
