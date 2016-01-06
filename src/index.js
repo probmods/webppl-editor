@@ -274,7 +274,11 @@ var Result = React.createClass({
 
     };
 
-    var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) })
+    var targets = _.reject(this.props.pieces,function(t) { return t.type == 'draw' && t.command != 'init'});
+    var targetUpdates = _.filter(this.props.pieces,function(t) { return t.type == 'draw' && t.command != 'init'});
+    var piecesKeyed = targets.map(function(t,i) { return renderPiece(t,i) });
+    targetUpdates.forEach(function(upd) { renderPiece(upd, null) });
+
     return (
       <div className={this.props.newborn ? 'result hide' : 'result'}>
         {piecesKeyed}
