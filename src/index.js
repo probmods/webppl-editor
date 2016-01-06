@@ -195,6 +195,9 @@ var ResultBarChart = React.createClass({
 });
 
 var PaperComponent = React.createClass({
+  getInitialState: function() {
+    return {commands: []}
+  },
   // TODO: use the hidden prop
   render: function() {
     return (<canvas className="paper" width={this.props.width} height={this.props.height} />)
@@ -206,32 +209,43 @@ var PaperComponent = React.createClass({
     paper.view.draw();
     this.paper = paper;
   },
-  circle: function(x, y, radius, stroke, fill) {
-    console.log(' circle called ')
-
-    var point = new this.paper.Point(x, y);
-    var circle = new this.paper.Path.Circle(point, radius || 50);
-    circle.fillColor = fill || 'black';
-    circle.strokeColor = stroke || 'black';
+  componentDidUpdate: function(oldProps, oldState) {
+    var oldCommands = oldState.commands;
+    var newCommands = this.state.commands;
+    for(var i = oldCommands.length, n = newCommands.length; i < n; i++) {
+      var fn = newCommands[i].command;
+      this[fn](newCommands[i]);
+    }
+  },
+  circle: function(opts) {
+    console.log('circle called') ;
+    var point = new this.paper.Point(opts.x, opts.y);
+    var circle = new this.paper.Path.Circle(point, opts.radius || 50);
+    circle.fillColor = opts.fill || 'black';
+    circle.strokeColor = opts.stroke || 'black';
     circle.opacity = 0.1; // TODO: remove me
     this.paper.view.draw();
   },
-  line: function(x1, y1, x2, y2, strokeWidth, opacity, color) {
+  line: function(opts) {
     var path = new this.paper.Path();
-    path.strokeColor = color || 'black';
-    path.strokeWidth = strokeWidth || 8;
-    path.opacity = opacity || 0.6;
-    path.moveTo(x1, y1);
-    path.lineTo(this.newPoint(x2, y2));
+    path.strokeColor = opts.color || 'black';
+    path.strokeWidth = opts.strokeWidth || 8;
+    path.opacity = opts.opacity || 0.6;
+    path.moveTo(opts.x1, opts.y1);
+    var endPoint = new this.paper.Point(opts.x2, opts.y2);
+    path.lineTo(endPoint);
     this.paper.view.draw();
   },
-  polygon: function(x, y, n, radius, stroke, fill){
-    var point = new this.paper.Point(x, y);
-    var polygon = new this.paper.Path.RegularPolygon(point, n, radius || 20);
-    polygon.fillColor = fill || 'white';
-    polygon.strokeColor = stroke || 'black';
+  polygon: function(opts){
+    var point = new this.paper.Point(opts.x, opts.y);
+    var polygon = new this.paper.Path.RegularPolygon(point, opts.n, opts.radius || 20);
+    polygon.fillColor = opts.fill || 'white';
+    polygon.strokeColor = opts.stroke || 'black';
     polygon.strokeWidth = 4;
     this.paper.view.draw();
+  },
+  toArray: function() {
+    console.log('toarray called');
   }
 });
 
@@ -251,22 +265,10 @@ var Result = React.createClass({
       } else if (d.type == 'barChart') {
         return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
       } else if (d.type == 'draw') {
-        if (d.command == 'init')
+        if (d.command == 'init') {
           return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} />)
-
-        var paperComponent = comp.refs[d.canvasId];
-
-        // TODO: there is redundancy between these calls and PaperComponent method signatures.
-        // refactor DrawObject prototype methods in src/draw.js so i can just pass a dictionary from here
-        // to PaperComponent methods
-        if (d.command == 'line') {
-          paperComponent.line(d.x1, d.y1, d.x2, d.y2, d.strokeWidth, d.opacity, d.color)
-        } else if (d.command == 'polygon') {
-          paperComponent.polygon(d.x, d.y, d.n, d.radius, d.stroke, d.fill)
-        } else if (d.command == 'circle') {
-          paperComponent.circle(d.x, d.y, d.radius, d.stroke, d.fill)
         } else {
-          console.log('unrouted paper command: ', d)
+          throw new Error('non-init draw command sent to <Result> render()')
         }
       } else {
         console.log('unrouted command: ', d)
@@ -274,10 +276,7 @@ var Result = React.createClass({
 
     };
 
-    var targets = _.reject(this.props.pieces,function(t) { return t.type == 'draw' && t.command != 'init'});
-    var targetUpdates = _.filter(this.props.pieces,function(t) { return t.type == 'draw' && t.command != 'init'});
-    var piecesKeyed = targets.map(function(t,i) { return renderPiece(t,i) });
-    targetUpdates.forEach(function(upd) { renderPiece(upd, null) });
+    var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) });
 
     return (
       <div className={this.props.newborn ? 'result hide' : 'result'}>
@@ -326,7 +325,7 @@ var CodeEditor = React.createClass({
 
     global.localStorage.setItem('code',this.state.code);
 
-    this.setState({newborn: false});
+    this.setState({newborn: false, pieces: []});
     var comp = this;
     var code = this.state.code;
     var language = this.props.language;
@@ -361,10 +360,16 @@ var CodeEditor = React.createClass({
         if (d.type == 'status') {
           comp.setState({execution: d.status})
         } else {
-          // this ends up passing lightweight data to Results
-          // so we can set refs there for draw objects
-          // (refs must be set inside render)
-          comp.addResult(m.data)
+
+          if (d.type !== 'draw' || d.type == 'draw' && d.command == 'init') {
+            // if we aren't drawing any new paper stuff to the screen, add a target to Result
+            comp.addResult(m.data)
+          } else if (d.type == 'draw' && d.command !== 'init') {
+            // otherwise, update the state of the proper PaperComponent
+            comp.refs.result.refs[d.canvasId].setState(function(oldState) {
+              return {commands: oldState.commands.concat(d)}
+            })
+          }
         }
 
         if (d.done) {
@@ -417,7 +422,7 @@ var CodeEditor = React.createClass({
       <div ref="cont">
           <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
           <RunButton status={this.state.execution} clickHandler={this.runCode} />
-          <Result newborn={this.state.newborn} pieces={this.state.pieces} />
+          <Result ref="result" newborn={this.state.newborn} pieces={this.state.pieces} />
       </div>
     );
 
