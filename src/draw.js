@@ -56,10 +56,6 @@ DrawObject.prototype.line = function(x1, y1, x2, y2, strokeWidth, opacity, color
               })
 };
 
-DrawObject.prototype.redraw = function(){
-  // unnecessary?
-};
-
 DrawObject.prototype.toArray = function(){
   postMessage({type: 'draw',
                command: 'toArray',
