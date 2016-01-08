@@ -1,6 +1,10 @@
-function DrawObject(width, height, visible){
+var numCanvases = 0;
 
-  this.canvasId = (new Date()).getTime() + "";
+function DrawObject(width, height, visible){
+  // (new Date()).getTime() had uniqueness problems (weird) so use a manual counter for now
+  this.canvasId = numCanvases + "";
+
+  numCanvases += 1;
 
   postMessage({type: 'draw',
                command: 'init',
