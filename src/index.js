@@ -287,8 +287,6 @@ var Result = React.createClass({
 
 var wait = function(ms,f) {
   return setTimeout(f,ms);
-    // TODO: in general, numeric index based keys aren't recommended
-    // but they might work for our use case (essentially append-only)
 }
 
 // use just a single worker for now since running a lot of
@@ -310,6 +308,8 @@ var RunButton = React.createClass({
   }
 });
 
+    // TODO: in general, numeric index based keys aren't recommended
+    // but they might work for our use case (essentially append-only)
 var paperComponents = {};
 
 var CodeEditor = React.createClass({
