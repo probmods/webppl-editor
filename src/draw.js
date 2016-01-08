@@ -2,7 +2,7 @@ var numCanvases = 0;
 
 function DrawObject(width, height, visible){
   // (new Date()).getTime() had uniqueness problems (weird) so use a manual counter for now
-  this.canvasId = numCanvases + "";
+  this.canvasId = (new Date()).getTime() + "." + numCanvases;
 
   numCanvases += 1;
 
