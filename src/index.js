@@ -65,7 +65,7 @@ var ResultText = React.createClass({
   render: function() {
     console.log('text renderer called')
     return (
-        <pre key={this.props.key} className='text'>{this.props.message}</pre>
+        <pre key={this.props.key} className='text'>{this.props.message + ""}</pre>
     );
   }
 });
