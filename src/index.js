@@ -29,21 +29,6 @@ global.d3 = require('d3'); // debugging
 //var vl = require('vega-lite');
 var vg = require('vega');
 
-// NB: redundant with worker.js
-var serializeReturnValue = function(x) {
-  if (x && (x.score != undefined) && (x.sample != undefined))
-    return '<erp>';
-
-  if (typeof x == 'function')
-    return '<function ' + x.name + '>';
-
-  if (typeof x == 'string') {
-    return x;
-  }
-
-  return x;
-};
-
 
 var _ = require('underscore');
 global._ = _; // debugging
