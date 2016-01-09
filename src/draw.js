@@ -2,7 +2,7 @@ var numCanvases = 0;
 
 function DrawObject(width, height, visible){
   // (new Date()).getTime() had uniqueness problems (weird) so use a manual counter for now
-  this.canvasId = (new Date()).getTime() + "." + numCanvases;
+  this.canvasId = (new Date()).getTime() + "_" + numCanvases;
 
   numCanvases += 1;
 
@@ -56,6 +56,7 @@ DrawObject.prototype.line = function(x1, y1, x2, y2, strokeWidth, opacity, color
               })
 };
 
+// remove this; it's not a public method
 DrawObject.prototype.toArray = function(){
   postMessage({type: 'draw',
                command: 'toArray',
@@ -63,13 +64,28 @@ DrawObject.prototype.toArray = function(){
               })
 };
 
-DrawObject.prototype.distanceF = function(f, cmpDrawObject){
-};
+// NB: had to rewrite this as non-prototype method. otherwise, it was impossible to
+// get the return value from the main thread
+var distance = function(s, k, a, thisDrawObject, thatDrawObject){
+  // TODO: a better event handler registration system than this
+  self._onmessage = self.onmessage;
+  self.onmessage = function(e) {
+    var result = e.data.distance;
+    var trampoline = k(s, result);
+    while (trampoline) {
+      trampoline = trampoline();
+    }
 
-DrawObject.prototype.distance = function(cmpDrawObject){
+  }
+  postMessage({type: 'draw',
+               command: 'distance',
+               canvasId: thisDrawObject.canvasId,
+               compareCanvasId: thatDrawObject.canvasId
+              })
 };
 
 DrawObject.prototype.destroy = function(){
+  // TODO
 }
 
 function Draw(s, k, a, width, height, visible){
@@ -77,6 +93,12 @@ function Draw(s, k, a, width, height, visible){
 }
 
 function loadImage(s, k, a, drawObject, url){
+  postMessage({type: 'draw',
+               command: 'loadImage',
+               canvasId: drawObject.canvasId,
+               url: url})
+
+
   // Synchronous loading - only continue with computation once image is loaded
   var context = drawObject.canvas.getContext('2d');
   var imageObj = new Image();

@@ -1,3 +1,5 @@
+// TODO: just running flip(0.5) doesn't work in the editor
+
 'use strict';
 
 var React = require('react');
@@ -6,7 +8,14 @@ var Paper = require('paper');
 
 var CodeMirrorComponent = require('react-codemirror');
 
-
+function euclideanDistance(v1, v2){
+  var i;
+  var d = 0;
+  for (i = 0; i < v1.length; i++) {
+    d += (v1[i] - v2[i])*(v1[i] - v2[i]);
+  }
+  return Math.sqrt(d);
+};
 
 // get access to the private CM function inside react-codemirror
 // this works because node require calls are cached
@@ -194,13 +203,14 @@ var ResultBarChart = React.createClass({
   }
 });
 
+
 var PaperComponent = React.createClass({
   getInitialState: function() {
     return {commands: []}
   },
   // TODO: use the hidden prop
   render: function() {
-    return (<canvas className="paper" width={this.props.width} height={this.props.height} />)
+    return (<canvas data-cid={this.props.canvasId} className="paper" width={this.props.width} height={this.props.height} />)
   },
   componentDidMount: function() {
     var paper = new Paper.PaperScope();
@@ -246,6 +256,37 @@ var PaperComponent = React.createClass({
   },
   toArray: function() {
     console.log('toarray called');
+  },
+  distance: function(opts) {
+    var thisCanvas = ReactDOM.findDOMNode(this);
+
+    var thatCanvas = $('canvas[data-reactid*=\'' + opts.compareCanvasId + '\'')[0];
+
+    if (!((thisCanvas.width == thatCanvas.width) &&
+          (thisCanvas.height == thatCanvas.height))){
+      console.log(thisCanvas.width, thatCanvas.width,
+                  thisCanvas.height, thatCanvas.height);
+      // TODO: get this to appear in the results div
+      throw new Error("Dimensions must match for distance computation!");
+    }
+
+    var thisData = thisCanvas.getContext('2d').getImageData(0, 0, thisCanvas.width, thisCanvas.height);
+    var thatData = thatCanvas.getContext('2d').getImageData(0, 0, thatCanvas.width, thatCanvas.height);
+
+    var f = opts.f || function(thisData, thatData) {
+      var distance = 0;
+      for (var i=0; i<thisData.length; i+=4) {
+        var col1 = [thisData[i], thisData[i+1], thisData[i+2], thisData[i+3]];
+        var col2 = [thatData[i], thatData[i+1], thatData[i+2], thatData[i+3]];
+        distance += euclideanDistance(col1, col2);
+      };
+      return distance;
+    }
+
+    worker.postMessage({
+      library: 'paper.js',
+      distance: f(thisData.data, thatData.data)
+    });
   }
 });
 
@@ -266,6 +307,7 @@ var Result = React.createClass({
         return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
       } else if (d.type == 'draw') {
         if (d.command == 'init') {
+          console.log(d.canvasId)
           return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} />)
         } else {
           throw new Error('non-init draw command sent to <Result> render()')
@@ -276,6 +318,8 @@ var Result = React.createClass({
 
     };
 
+    // TODO: in general, numeric index based keys aren't recommended
+    // but they might work for our use case (essentially append-only)
     var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) });
 
     return (
@@ -308,8 +352,6 @@ var RunButton = React.createClass({
   }
 });
 
-    // TODO: in general, numeric index based keys aren't recommended
-    // but they might work for our use case (essentially append-only)
 var paperComponents = {};
 
 var CodeEditor = React.createClass({
@@ -474,6 +516,8 @@ global.initializeWorker = function(webpplPath) {
                       // TODO: take this as wpCodeEditor argument
                       path: webpplPath})
 
+  // TODO: bundle this? or document instructions for how to do this
+  // for consumers of this library (e.g., dippl)
   worker.postMessage({type: 'init',
                       path: makeAbsolutePath('../src/draw.js')})
 
