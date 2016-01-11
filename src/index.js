@@ -270,6 +270,23 @@ var PaperComponent = React.createClass({
       library: 'paper.js',
       distance: f(thisData.data, thatData.data)
     });
+  },
+  loadImage: function(opts) {
+    var thisCanvas = ReactDOM.findDOMNode(this);
+    var context = thisCanvas.getContext('2d');
+    var imageObj = new Image();
+    var comp = this;
+
+    imageObj.onload = function() {
+      var raster = new comp.paper.Raster(imageObj);
+      raster.position = comp.paper.view.center;
+      comp.paper.view.draw();
+      worker.postMessage({
+        library: 'paper.js',
+        loadImage: opts.url
+      })
+    };
+    imageObj.src = opts.url;
   }
 });
 

@@ -96,24 +96,21 @@ function Draw(s, k, a, width, height, visible){
 }
 
 function loadImage(s, k, a, drawObject, url){
+  self._onmessage = self.onmessage;
+  self.onmessage = function(e) {
+    // restore message handler
+    self.onmessage = self._onmessage;
+
+    var trampoline = k(s);
+    while (trampoline) {
+      trampoline = trampoline();
+    }
+
+  }
+
   postMessage({type: 'draw',
                command: 'loadImage',
                canvasId: drawObject.canvasId,
                url: url})
 
-
-  // Synchronous loading - only continue with computation once image is loaded
-  var context = drawObject.canvas.getContext('2d');
-  var imageObj = new Image();
-  imageObj.onload = function() {
-    var raster = new drawObject.paper.Raster(imageObj);
-    raster.position = drawObject.paper.view.center;
-    drawObject.redraw();
-    var trampoline = k(s);
-    while (trampoline){
-      trampoline = trampoline();
-    }
-  };
-  imageObj.src = url;
-  return false;
 }
