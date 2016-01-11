@@ -1,5 +1,3 @@
-// TODO: just running flip(0.5) doesn't work in the editor
-
 'use strict';
 
 var React = require('react');
@@ -445,6 +443,7 @@ var CodeEditor = React.createClass({
     };
 
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
+    // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
       <div ref="cont">
           <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
