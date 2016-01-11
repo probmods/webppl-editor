@@ -70,7 +70,10 @@ var distance = function(s, k, a, thisDrawObject, thatDrawObject){
   // TODO: a better event handler registration system than this
   self._onmessage = self.onmessage;
   self.onmessage = function(e) {
+    // restore message handler
+    self.onmessage = self._onmessage;
     var result = e.data.distance;
+
     var trampoline = k(s, result);
     while (trampoline) {
       trampoline = trampoline();
