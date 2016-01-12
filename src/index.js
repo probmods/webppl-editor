@@ -417,7 +417,7 @@ var CodeEditor = React.createClass({
                 var newPieces = _.select(oldPieces,
                                          function(c) { return c.canvasId !== d.canvasId })
 
-                console.log(d.canvasId + ' destroy : ', oldPieces.length + ' -> ' + newPieces.length);
+                // console.log(d.canvasId + ' destroy : ', oldPieces.length + ' -> ' + newPieces.length);
                 return {pieces: newPieces}
               })
             } else {
@@ -539,7 +539,7 @@ global.initializeWorker = function(webpplPath) {
   // TODO: bundle this? or document instructions for how to do this
   // for consumers of this library (e.g., dippl)
   worker.postMessage({type: 'init',
-                      path: makeAbsolutePath('../src/draw.js')})
+                      path: makeAbsolutePath('../src/worker-draw.js')})
 
 }
 

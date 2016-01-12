@@ -74,6 +74,7 @@ var distance = function(s, k, a, thisDrawObject, thatDrawObject){
     var result = e.data.distance;
 
     var trampoline = k(s, result);
+
     while (trampoline) {
       trampoline = trampoline();
     }
@@ -97,6 +98,7 @@ function loadImage(s, k, a, drawObject, url){
     self.onmessage = self._onmessage;
 
     var trampoline = k(s);
+
     while (trampoline) {
       trampoline = trampoline();
     }
