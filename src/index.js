@@ -238,9 +238,6 @@ var PaperComponent = React.createClass({
     polygon.strokeWidth = 4;
     this.paper.view.draw();
   },
-  toArray: function() {
-    console.log('toarray called');
-  },
   distance: function(opts) {
     var thisCanvas = ReactDOM.findDOMNode(this);
 

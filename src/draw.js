@@ -56,10 +56,9 @@ DrawObject.prototype.line = function(x1, y1, x2, y2, strokeWidth, opacity, color
               })
 };
 
-// remove this; it's not a public method
-DrawObject.prototype.toArray = function(){
+DrawObject.prototype.destroy = function(){
   postMessage({type: 'draw',
-               command: 'toArray',
+               command: 'destroy',
                canvasId: this.canvasId
               })
 };
@@ -86,10 +85,6 @@ var distance = function(s, k, a, thisDrawObject, thatDrawObject){
                compareCanvasId: thatDrawObject.canvasId
               })
 };
-
-DrawObject.prototype.destroy = function(){
-  // TODO
-}
 
 function Draw(s, k, a, width, height, visible){
   return k(s, new DrawObject(width, height, visible));
