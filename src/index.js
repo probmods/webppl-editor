@@ -191,9 +191,10 @@ var PaperComponent = React.createClass({
   getInitialState: function() {
     return {commands: []}
   },
-  // TODO: use the hidden prop
   render: function() {
-    return (<canvas data-cid={this.props.canvasId} className="paper" width={this.props.width} height={this.props.height} />)
+    var classNames = (this.props.visible ? ['paper']: ['paper', 'hidden']).join(' ')
+
+    return (<canvas className={classNames} width={this.props.width} height={this.props.height} />)
   },
   componentDidMount: function() {
     var paper = new Paper.PaperScope();
