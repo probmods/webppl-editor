@@ -186,19 +186,18 @@ var ResultBarChart = React.createClass({
   }
 });
 
-
 var PaperComponent = React.createClass({
   getInitialState: function() {
     return {commands: []}
   },
   render: function() {
     var classNames = (this.props.visible ? ['paper']: ['paper', 'hidden']).join(' ')
-
-    return (<canvas className={classNames} width={this.props.width} height={this.props.height} />)
+    return (<canvas id={this.props.canvasId} className={classNames} width={this.props.width} height={this.props.height} />)
   },
   componentDidMount: function() {
     var paper = new Paper.PaperScope();
-    paper.setup(ReactDOM.findDOMNode(this));
+    this.canvas = ReactDOM.findDOMNode(this);
+    paper.setup(this.canvas);
     paper.view.viewSize = new paper.Size(this.props.width,this.props.height);
     paper.view.draw();
     this.paper = paper;
@@ -239,7 +238,7 @@ var PaperComponent = React.createClass({
     this.paper.view.draw();
   },
   distance: function(opts) {
-    var thisCanvas = ReactDOM.findDOMNode(this);
+    var thisCanvas = this.canvas;
 
     var thatCanvas = $('canvas[data-reactid*=\'' + opts.compareCanvasId + '\'')[0];
 
@@ -270,7 +269,7 @@ var PaperComponent = React.createClass({
     });
   },
   loadImage: function(opts) {
-    var thisCanvas = ReactDOM.findDOMNode(this);
+    var thisCanvas = this.canvas;
     var context = thisCanvas.getContext('2d');
     var imageObj = new Image();
     var comp = this;
@@ -285,6 +284,11 @@ var PaperComponent = React.createClass({
       })
     };
     imageObj.src = opts.url;
+  },
+  destroy: function(opts) {
+    this.paper = null;
+    ReactDOM.unmountComponentAtNode(this.canvas);
+    $(this.canvas).remove();
   }
 });
 
@@ -305,8 +309,7 @@ var Result = React.createClass({
         return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
       } else if (d.type == 'draw') {
         if (d.command == 'init') {
-          console.log(d.canvasId)
-          return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} />)
+          return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} visible={d.visible} canvasId={d.canvasId} />)
         } else {
           throw new Error('non-init draw command sent to <Result> render()')
         }
@@ -401,14 +404,32 @@ var CodeEditor = React.createClass({
           comp.setState({execution: d.status})
         } else {
 
-          if (d.type !== 'draw' || d.type == 'draw' && d.command == 'init') {
-            // if we aren't drawing any new paper stuff to the screen, add a target to Result
+          if (d.type !== 'draw') {
             comp.addResult(m.data)
-          } else if (d.type == 'draw' && d.command !== 'init') {
-            // otherwise, update the state of the proper PaperComponent
-            comp.refs.result.refs[d.canvasId].setState(function(oldState) {
-              return {commands: oldState.commands.concat(d)}
-            })
+          } else {
+
+            if (d.command == 'init') {
+              comp.addResult(m.data);
+            } else if (d.command == 'destroy') {
+              comp.setState(function(oldState) {
+                var oldPieces = oldState.pieces;
+                var oldLength = oldPieces.length;
+                var newPieces = _.select(oldPieces,
+                                         function(c) { return c.canvasId !== d.canvasId })
+
+                console.log(d.canvasId + ' destroy : ', oldPieces.length + ' -> ' + newPieces.length);
+                return {pieces: newPieces}
+              })
+            } else {
+              var childComp = comp.refs.result.refs[d.canvasId];
+              if (childComp) {
+                childComp.setState(function(oldState) {
+                  return {commands: oldState.commands.concat(d)}
+                })
+              }
+            }
+            // if we aren't drawing any new paper stuff to the screen, add a target to Result
+
           }
         }
 
