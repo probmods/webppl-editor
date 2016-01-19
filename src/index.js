@@ -2,7 +2,6 @@
 
 var React = require('react');
 var ReactDOM = require('react-dom');
-var Paper = require('paper');
 
 var CodeMirrorComponent = require('react-codemirror');
 
@@ -44,13 +43,7 @@ var jobsQueue = [];
 
 require('react-codemirror/node_modules/codemirror/addon/edit/matchbrackets')
 require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
-// installs toggleComment
-require('react-codemirror/node_modules/codemirror/addon/comment/comment');
-
-
-// NB: require('codemirror/mode/javascript/javascript') doesn't work
-// might be able to avoid reaching into react-codemirror's copy of codemirror
-// by doing some browserify tricks with -x or -r or factor-bundle (TODO: investigate)
+require('react-codemirror/node_modules/codemirror/addon/comment/comment'); // installs toggleComment
 
 var ResultError = React.createClass({
   getInitialState: function() {
@@ -201,45 +194,6 @@ var ResultBarChart = React.createClass({
   }
 });
 
-
-var Result = React.createClass({
-  // append only
-  shouldComponentUpdate: function(nextProps, nextState) {
-    return !(_.isEqual(nextProps.pieces, this.props.pieces));
-  },
-  render: function() {
-    var comp = this;
-
-    var renderPiece = function(d,k) {
-      if (d.type == 'text') {
-        return <ResultText key={k} message={d.message} />
-      } else if (d.type == 'error') {
-        return <ResultError key={k} message={d.message} stack={d.stack} />
-      } else if (d.type == 'barChart') {
-        return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
-      } else if (d.type == 'draw') {
-        if (d.command == 'init') {
-          return (<PaperComponent ref={d.canvasId} key={d.canvasId} width={d.width} height={d.height} visible={d.visible} canvasId={d.canvasId} />)
-        } else {
-          throw new Error('non-init draw command sent to <Result> render()')
-        }
-      } else {
-        console.log('unrouted command: ', d)
-      }
-
-    };
-
-    // TODO: in general, numeric index based keys aren't recommended
-    // but they might work for our use case (essentially append-only)
-    var piecesKeyed = this.props.pieces.map(function(p,i) { return renderPiece(p,i) });
-
-    return (
-      <div className={this.props.newborn ? 'result hide' : 'result'}>
-        {piecesKeyed}
-      </div>);
-  }
-});
-
 var wait = function(ms,f) {
   return setTimeout(f,ms);
 }
@@ -265,7 +219,7 @@ var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
       code: this.props.code,
-      pieces: [],
+      results: [],
       newborn: true,
       execution: "idle"
     }
@@ -274,7 +228,7 @@ var CodeEditor = React.createClass({
 
     global.localStorage.setItem('code',this.state.code);
 
-    this.setState({newborn: false, pieces: []});
+    this.setState({newborn: false, results: []});
     var comp = this;
     var code = this.state.code;
     var language = this.props.language;
@@ -358,7 +312,7 @@ var CodeEditor = React.createClass({
     // but later stumbled on a good explanation of why we need it at
     // https://kevinmccarthy.org/2015/07/05/multiple-async-callbacks-updating-state-in-react/
     this.setState(function(state, props) {
-      return {pieces: state.pieces.concat(result)}
+      return {results: state.results.concat(result)}
     });
   },
   render: function() {
@@ -376,17 +330,34 @@ var CodeEditor = React.createClass({
       }
     };
 
+    var renderResult = function(d,k) {
+      if (d.type == 'text') {
+        return <ResultText key={k} {...d} />
+      } else if (d.type == 'error') {
+        return <ResultError key={k} {...d} />
+      } else if (d.type == 'barChart') {
+        return <ResultBarChart key={k} {...d} />
+      } else {
+        console.log('unrouted command: ', d)
+      }
+
+    };
+
+    // TODO: in general, numeric index based keys aren't recommended
+    // but they might work for our use case (essentially append-only)
+    var results = this.state.results.map(function(r,i) { return renderResult(r,i) });
+
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
       <div ref="cont">
-          <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
-          <RunButton status={this.state.execution} clickHandler={this.runCode} />
-          <Result ref="result" newborn={this.state.newborn} pieces={this.state.pieces} />
+        <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
+        <RunButton status={this.state.execution} clickHandler={this.runCode} />
+        <div className={this.state.newborn ? "result hide" : "result"}>
+          {results}
+        </div>
       </div>
     );
-
-
   }
 });
 
@@ -416,14 +387,14 @@ var setupCode = function(preEl, options) {
   })
 };
 
-var makeAbsolutePath = function(relativePath) {
-  var prefix = _.initial(window.location.href.split('/')).join('/');
-  return [prefix,'/',relativePath].join('');
-}
+// var makeAbsolutePath = function(relativePath) {
+//   var prefix = _.initial(window.location.href.split('/')).join('/');
+//   return [prefix,'/',relativePath].join('');
+// }
 
-var isPathRelative = function(path) {
-  return !(/^(?:\/|[a-z]+:\/\/)/.test(path))
-}
+// var isPathRelative = function(path) {
+//   return !(/^(?:\/|[a-z]+:\/\/)/.test(path))
+// }
 
 global.wpCodeEditor = setupCode;
 global.wpLiterateEditor = setupLiterate;
