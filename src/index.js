@@ -39,8 +39,6 @@ var vg = require('vega');
 var _ = require('underscore');
 global._ = _; // debugging
 
-var jobsQueue = [];
-
 require('react-codemirror/node_modules/codemirror/addon/edit/matchbrackets')
 require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
 require('react-codemirror/node_modules/codemirror/addon/comment/comment'); // installs toggleComment
@@ -220,6 +218,7 @@ var RunButton = React.createClass({
   }
 });
 
+var jobsQueue = [];
 var compileCache = {};
 
 var CodeEditor = React.createClass({
@@ -232,18 +231,48 @@ var CodeEditor = React.createClass({
       resultDivMinHeight: 0
     }
   },
+  // side effects
+  // these methods draw to the results div of a particular CodeEditor instance
+  // the actively running codebox will inject them into global once it starts running
+  // ------------------------------------------------------------
+  print: function(s,k,a,x) {
+    this.addResult({type: 'text', message: x})
+    return k(s)
+  },
+  hist: function(s,k,a,samples) {
+    var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+    var labels = _(frequencyDict).keys();
+    var counts = _(frequencyDict).values();
+    this.addResult({type: 'barChart', ivs: labels, dvs: counts})
+    return k(s)
+  },
+  barChart: function(s,k,a,ivs, dvs) {
+    this.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
+    return k(s)
+  },
+  makeResultContainer: function() {
+    // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
+    this.addResult(_.extend({type: 'DOM'}));
+
+    // return the most recent custom component
+    // TODO: don't depend on jquery for this
+    return _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
+  },
+  // ------------------------------------------------------------
   runCode: function() {
-
     global.localStorage.setItem('code',this.state.code);
-
     var $resultsDiv = $(ReactDOM.findDOMNode(this)).find(".result");
 
     this.setState({newborn: false, results: []});
     var comp = this;
     var code = this.state.code;
-    var language = this.props.language;
+    var language = this.props.language; // TODO: detect this from CodeMirror text
 
-    var drawObjects = {};
+    var endJob = function(store, returnValue) {
+      var renderedReturnValue = renderReturnValue(returnValue);
+      comp.addResult({type: 'text', message: renderedReturnValue });
+      cleanup();
+    }
 
     var cleanup = function() {
       comp.setState({execution: 'idle'}, function() {
@@ -254,7 +283,6 @@ var CodeEditor = React.createClass({
 
       // remove completed job
       jobsQueue.shift();
-
       // if there are remaining jobs, start on the next one
       if (jobsQueue.length > 0) {
         jobsQueue[0]()
@@ -263,50 +291,21 @@ var CodeEditor = React.createClass({
 
     var job = function() {
 
-      // direct side effects to results area of current CodeEditor
-      global.print = function(s,k,a,x) {
-        comp.addResult({type: 'text', message: x})
-        return k(s)
-      };
-
-      global.hist = function(s,k,a,samples) {
-        var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
-        var labels = _(frequencyDict).keys();
-        var counts = _(frequencyDict).values();
-        comp.addResult({type: 'barChart', ivs: labels, dvs: counts})
-        return k(s)
-      };
-
-      global.barChart = function(s,k,a,ivs, dvs) {
-        comp.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
-        return k(s)
-      };
-
-      // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
-      global.makeResultContainer = function() {
-        comp.addResult(_.extend({type: 'DOM'}));
-        // return the most recent custom component
-        // TODO: don't depend on jquery for this
-        return _.last( $(ReactDOM.findDOMNode(comp)).find(".custom") );
-      }
-
-      var endJob = function(store, returnValue) {
-        var renderedReturnValue = renderReturnValue(returnValue);
-        comp.addResult({type: 'text', message: renderedReturnValue });
-        cleanup();
-      }
+      // inject this component's side effect methods into global
+      var sideEffectMethods = ["print","hist","barChart","makeResultContainer"];
+      _.each(sideEffectMethods,
+             function(name) { global[name] = comp[name]; });
 
       comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
 
       // use wait() so that runButton dom changes actually appear
       wait(20, function() {
+        // compile code if we need to
         if (!compileCache[code]) {
-
-          // catch compilation errors
-          // TODO: better message for returnify
           try {
             compileCache[code] = webppl.compile(code, 'verbose');
           } catch (e) {
+            // TODO: better message for returnify
             comp.addResult({type: 'error', message: e.message, stack: e.stack});
             cleanup();
           }
@@ -315,7 +314,6 @@ var CodeEditor = React.createClass({
         comp.setState({execution: 'running'});
 
         wait(20, function() {
-
           try {
             eval.call({}, compileCache[code])({}, endJob, '');
           } catch(e) {
