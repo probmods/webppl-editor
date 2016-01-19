@@ -245,33 +245,6 @@ var CodeEditor = React.createClass({
 
     var drawObjects = {};
 
-    // direct side effects to results area of current CodeEditor
-    global.print = function(s,k,a,x) {
-      comp.addResult({type: 'text', message: x})
-      return k(s)
-    };
-
-    global.hist = function(s,k,a,samples) {
-      var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
-      var labels = _(frequencyDict).keys();
-      var counts = _(frequencyDict).values();
-      comp.addResult({type: 'barChart', ivs: labels, dvs: counts})
-      return k(s)
-    };
-
-    global.barChart = function(s,k,a,ivs, dvs) {
-      comp.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
-      return k(s)
-    };
-
-    // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
-    global.makeResultContainer = function() {
-      comp.addResult(_.extend({type: 'DOM'}));
-      // return the most recent custom component
-      // TODO: don't depend on jquery for this
-      return _.last( $(ReactDOM.findDOMNode(comp)).find(".custom") );
-    }
-
     var cleanup = function() {
       comp.setState({execution: 'idle'}, function() {
         // set resultDivMinHeight with callback because we need to make sure the idle style is applied first
@@ -289,6 +262,33 @@ var CodeEditor = React.createClass({
     }
 
     var job = function() {
+
+      // direct side effects to results area of current CodeEditor
+      global.print = function(s,k,a,x) {
+        comp.addResult({type: 'text', message: x})
+        return k(s)
+      };
+
+      global.hist = function(s,k,a,samples) {
+        var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+        var labels = _(frequencyDict).keys();
+        var counts = _(frequencyDict).values();
+        comp.addResult({type: 'barChart', ivs: labels, dvs: counts})
+        return k(s)
+      };
+
+      global.barChart = function(s,k,a,ivs, dvs) {
+        comp.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
+        return k(s)
+      };
+
+      // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
+      global.makeResultContainer = function() {
+        comp.addResult(_.extend({type: 'DOM'}));
+        // return the most recent custom component
+        // TODO: don't depend on jquery for this
+        return _.last( $(ReactDOM.findDOMNode(comp)).find(".custom") );
+      }
 
       var endJob = function(store, returnValue) {
         var renderedReturnValue = renderReturnValue(returnValue);
