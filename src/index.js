@@ -63,12 +63,16 @@ var ResultError = React.createClass({
   }
 });
 
+// React's render is called any time new results are entered or the codebox is edited
+// To avoid this, we can do a lightweight version of PureRenderMixin:
+// see http://stackoverflow.com/a/24719289/351329
+var pureSCU = function(nextProps, nextState) {
+  return !(_.isEqual(nextProps, this.props) && _.isEqual(nextState, nextState))
+}
+
 var ResultText = React.createClass({
-  shouldComponentUpdate: function() {
-    return false
-  },
+  shouldComponentUpdate: pureSCU,
   render: function() {
-    console.log('text renderer called')
     return (
         <pre key={this.props.key} className='text'>{this.props.message + ""}</pre>
     );
@@ -76,12 +80,7 @@ var ResultText = React.createClass({
 });
 
 var ResultBarChart = React.createClass({
-  // render is called any time new results are entered or the codebox is edited
-  // we can do a lightweight version of PureRenderMixin by just return false
-  // here. see also http://stackoverflow.com/a/24719289/351392
-  shouldComponentUpdate: function(nextProps, nextState) {
-    return false
-  },
+  shouldComponentUpdate: pureSCU,
   componentDidMount: function() {
     var ivs = this.props.ivs;
     var dvs = this.props.dvs;
@@ -189,7 +188,6 @@ var ResultBarChart = React.createClass({
 
   },
   render: function() {
-    console.log('barchart render');
     return (<div ref="div" />);
   }
 });
