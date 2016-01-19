@@ -10,7 +10,14 @@
 }
 
 pre.error {
-    color: red
+    background-color: red;
+    color: white;
+}
+
+.error-message {
+    font-weight: bold;
+    text-decoration: underline;
+    cursor: pointer
 }
 
 .stale {

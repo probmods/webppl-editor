@@ -6,13 +6,22 @@ var Paper = require('paper');
 
 var CodeMirrorComponent = require('react-codemirror');
 
-function euclideanDistance(v1, v2){
-  var i;
-  var d = 0;
-  for (i = 0; i < v1.length; i++) {
-    d += (v1[i] - v2[i])*(v1[i] - v2[i]);
+var renderReturnValue = function(x) {
+  if (x === undefined) {
+    return ""
   }
-  return Math.sqrt(d);
+
+  if (x && (x.score != undefined) && (x.sample != undefined))
+    return '<erp>';
+
+  if (typeof x == 'function')
+    return '<function ' + x.name + '>';
+
+  if (typeof x == 'string') {
+    return x;
+  }
+
+  return JSON.stringify(x);
 };
 
 // get access to the private CM function inside react-codemirror
@@ -31,8 +40,6 @@ var vg = require('vega');
 var _ = require('underscore');
 global._ = _; // debugging
 
-var work = require('webworkify');
-
 var jobsQueue = [];
 
 require('react-codemirror/node_modules/codemirror/addon/edit/matchbrackets')
@@ -46,12 +53,19 @@ require('react-codemirror/node_modules/codemirror/addon/comment/comment');
 // by doing some browserify tricks with -x or -r or factor-bundle (TODO: investigate)
 
 var ResultError = React.createClass({
-  shouldComponentUpdate: function() {
-    return false
+  getInitialState: function() {
+    return {showStack: false}
   },
+  handleClick: function(e) {
+    this.setState({showStack: !this.state.showStack})
+  },
+  // shouldComponentUpdate: function() {
+  //   return false
+  // },
   render: function() {
+    var stack = this.state.showStack ? "\n" + this.props.stack : "";
     return (
-        <pre key={this.props.key} className='error'>{this.props.message}</pre>
+        <pre key={this.props.key} className='error' onClick={this.handleClick}><span className='error-message'>{this.props.message}</span>{stack}</pre>
     );
   }
 });
@@ -69,12 +83,12 @@ var ResultText = React.createClass({
 });
 
 var ResultBarChart = React.createClass({
-  // // render is called any time new results are entered or the codebox is edited
-  // // we can do a lightweight version of PureRenderMixin by just return false
-  // // here. see also http://stackoverflow.com/a/24719289/351392
-  // shouldComponentUpdate: function(nextProps, nextState) {
-  //   return false
-  // },
+  // render is called any time new results are entered or the codebox is edited
+  // we can do a lightweight version of PureRenderMixin by just return false
+  // here. see also http://stackoverflow.com/a/24719289/351392
+  shouldComponentUpdate: function(nextProps, nextState) {
+    return false
+  },
   componentDidMount: function() {
     var ivs = this.props.ivs;
     var dvs = this.props.dvs;
@@ -182,115 +196,11 @@ var ResultBarChart = React.createClass({
 
   },
   render: function() {
+    console.log('barchart render');
     return (<div ref="div" />);
   }
 });
 
-var PaperComponent = React.createClass({
-  getInitialState: function() {
-    return {commands: []}
-  },
-  render: function() {
-    var classNames = (this.props.visible ? ['paper']: ['paper', 'hidden']).join(' ')
-    return (<canvas id={this.props.canvasId} className={classNames} width={this.props.width} height={this.props.height} />)
-  },
-  componentDidMount: function() {
-    var paper = new Paper.PaperScope();
-    this.canvas = ReactDOM.findDOMNode(this);
-    paper.setup(this.canvas);
-    paper.view.viewSize = new paper.Size(this.props.width,this.props.height);
-    paper.view.draw();
-    this.paper = paper;
-  },
-  componentDidUpdate: function(oldProps, oldState) {
-    var oldCommands = oldState.commands;
-    var newCommands = this.state.commands;
-    for(var i = oldCommands.length, n = newCommands.length; i < n; i++) {
-      var fn = newCommands[i].command;
-      this[fn](newCommands[i]);
-    }
-  },
-  circle: function(opts) {
-    console.log('circle called') ;
-    var point = new this.paper.Point(opts.x, opts.y);
-    var circle = new this.paper.Path.Circle(point, opts.radius || 50);
-    circle.fillColor = opts.fill || 'black';
-    circle.strokeColor = opts.stroke || 'black';
-    circle.opacity = 0.1; // TODO: remove me
-    this.paper.view.draw();
-  },
-  line: function(opts) {
-    var path = new this.paper.Path();
-    path.strokeColor = opts.color || 'black';
-    path.strokeWidth = opts.strokeWidth || 8;
-    path.opacity = opts.opacity || 0.6;
-    path.moveTo(opts.x1, opts.y1);
-    var endPoint = new this.paper.Point(opts.x2, opts.y2);
-    path.lineTo(endPoint);
-    this.paper.view.draw();
-  },
-  polygon: function(opts){
-    var point = new this.paper.Point(opts.x, opts.y);
-    var polygon = new this.paper.Path.RegularPolygon(point, opts.n, opts.radius || 20);
-    polygon.fillColor = opts.fill || 'white';
-    polygon.strokeColor = opts.stroke || 'black';
-    polygon.strokeWidth = 4;
-    this.paper.view.draw();
-  },
-  distance: function(opts) {
-    var thisCanvas = this.canvas;
-
-    var thatCanvas = $('canvas[data-reactid*=\'' + opts.compareCanvasId + '\'')[0];
-
-    if (!((thisCanvas.width == thatCanvas.width) &&
-          (thisCanvas.height == thatCanvas.height))){
-      console.log(thisCanvas.width, thatCanvas.width,
-                  thisCanvas.height, thatCanvas.height);
-      // TODO: get this to appear in the results div
-      throw new Error("Dimensions must match for distance computation!");
-    }
-
-    var thisData = thisCanvas.getContext('2d').getImageData(0, 0, thisCanvas.width, thisCanvas.height);
-    var thatData = thatCanvas.getContext('2d').getImageData(0, 0, thatCanvas.width, thatCanvas.height);
-
-    var f = opts.f || function(thisData, thatData) {
-      var distance = 0;
-      for (var i=0; i<thisData.length; i+=4) {
-        var col1 = [thisData[i], thisData[i+1], thisData[i+2], thisData[i+3]];
-        var col2 = [thatData[i], thatData[i+1], thatData[i+2], thatData[i+3]];
-        distance += euclideanDistance(col1, col2);
-      };
-      return distance;
-    }
-
-    worker.postMessage({
-      library: 'paper.js',
-      distance: f(thisData.data, thatData.data)
-    });
-  },
-  loadImage: function(opts) {
-    var thisCanvas = this.canvas;
-    var context = thisCanvas.getContext('2d');
-    var imageObj = new Image();
-    var comp = this;
-
-    imageObj.onload = function() {
-      var raster = new comp.paper.Raster(imageObj);
-      raster.position = comp.paper.view.center;
-      comp.paper.view.draw();
-      worker.postMessage({
-        library: 'paper.js',
-        loadImage: opts.url
-      })
-    };
-    imageObj.src = opts.url;
-  },
-  destroy: function(opts) {
-    this.paper = null;
-    ReactDOM.unmountComponentAtNode(this.canvas);
-    $(this.canvas).remove();
-  }
-});
 
 var Result = React.createClass({
   // append only
@@ -302,9 +212,9 @@ var Result = React.createClass({
 
     var renderPiece = function(d,k) {
       if (d.type == 'text') {
-        return <ResultText key={k} message={d.obj} />
+        return <ResultText key={k} message={d.message} />
       } else if (d.type == 'error') {
-        return <ResultError key={k} message={d.message} />
+        return <ResultError key={k} message={d.message} stack={d.stack} />
       } else if (d.type == 'barChart') {
         return <ResultBarChart key={k} ivs={d.ivs} dvs={d.dvs} />
       } else if (d.type == 'draw') {
@@ -333,10 +243,6 @@ var Result = React.createClass({
 var wait = function(ms,f) {
   return setTimeout(f,ms);
 }
-
-// use just a single worker for now since running a lot of
-// workers would be a huge resource hog
-var worker = work(require('./worker.js'));
 
 var RunButton = React.createClass({
   getLabel: function() {
@@ -375,10 +281,32 @@ var CodeEditor = React.createClass({
 
     var drawObjects = {};
 
-    var job = function() {
-      comp.setState({execution: 'init'});
+    // direct side effects to results area of current CodeEditor
+    global.print = function(s,k,a,x) {
+      comp.addResult({type: 'text', message: x})
+      return k(s)
+    };
 
-      var endJob = function() {
+    global.hist = function(s,k,a,samples) {
+
+      var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
+      var labels = _(frequencyDict).keys();
+      var counts = _(frequencyDict).values();
+
+      comp.addResult({type: 'barChart', ivs: labels, dvs: counts})
+
+      return k(s)
+    };
+
+    var job = function() {
+      //comp.setState({execution: 'init'});
+
+      var endJob = function(store, returnValue) {
+
+        var renderedReturnValue = renderReturnValue(returnValue);
+
+        comp.addResult({type: 'text', message: renderedReturnValue })
+
         comp.setState({execution: 'idle'})
 
         // remove completed job
@@ -390,57 +318,27 @@ var CodeEditor = React.createClass({
         }
       }
 
-      worker.onerror = function(err) {
-        // get stack information from worker.js by wrapping eval call in a try-catch, then
-        // pass it here
-        comp.addResult({type: 'error', message: err.message});
-        endJob();
-      }
+      comp.setState({execution: 'compiling'});
+      wait(20, function() {
 
-      worker.onmessage = function(m) {
-        var d = m.data;
+        var compiled = webppl.compile(code, 'verbose');
 
-        if (d.type == 'status') {
-          comp.setState({execution: d.status})
-        } else {
+        comp.setState({execution: 'running'});
 
-          if (d.type !== 'draw') {
-            comp.addResult(m.data)
-          } else {
+        wait(20, function() {
 
-            if (d.command == 'init') {
-              comp.addResult(m.data);
-            } else if (d.command == 'destroy') {
-              comp.setState(function(oldState) {
-                var oldPieces = oldState.pieces;
-                var oldLength = oldPieces.length;
-                var newPieces = _.select(oldPieces,
-                                         function(c) { return c.canvasId !== d.canvasId })
-
-                // console.log(d.canvasId + ' destroy : ', oldPieces.length + ' -> ' + newPieces.length);
-                return {pieces: newPieces}
-              })
-            } else {
-              var childComp = comp.refs.result.refs[d.canvasId];
-              if (childComp) {
-                childComp.setState(function(oldState) {
-                  return {commands: oldState.commands.concat(d)}
-                })
-              }
-            }
-            // if we aren't drawing any new paper stuff to the screen, add a target to Result
-
+          try {
+            eval.call({}, compiled)({}, endJob, '');
+          } catch(e) {
+            comp.addResult({type: 'error', message: e.message, stack: e.stack})
+            comp.setState({execution: 'idle'});
+            jobsQueue.shift()
           }
-        }
 
-        if (d.done) {
-          endJob();
-        }
-      }
+        });
 
-      comp.setState({pieces: []});
-      worker.postMessage({language: language,
-                          code: code});
+      });
+
     };
 
     jobsQueue.push(job);
@@ -525,22 +423,6 @@ var makeAbsolutePath = function(relativePath) {
 
 var isPathRelative = function(path) {
   return !(/^(?:\/|[a-z]+:\/\/)/.test(path))
-}
-
-global.initializeWorker = function(webpplPath) {
-  if (isPathRelative(webpplPath)) {
-    webpplPath = makeAbsolutePath(webpplPath);
-  }
-
-  worker.postMessage({type: 'init',
-                      // TODO: take this as wpCodeEditor argument
-                      path: webpplPath})
-
-  // TODO: bundle this? or document instructions for how to do this
-  // for consumers of this library (e.g., dippl)
-  worker.postMessage({type: 'init',
-                      path: makeAbsolutePath('../src/worker-draw.js')})
-
 }
 
 global.wpCodeEditor = setupCode;

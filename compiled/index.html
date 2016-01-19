@@ -81,12 +81,12 @@ print('end 1')</code></pre>
     </div>
 
   </body>
+  <script src="webppl.js"></script>
   <script src="editor.js"></script>
   <script src="jquery.js"></script>
   <script src="paper.js"></script>
   <script src="draw-main.js"></script>
   <script>
-    initializeWorker('webppl.js'); // works with relative path
     var storedCode = localStorage.getItem('code');
     if (storedCode) {
     $("pre > code").html(storedCode)
