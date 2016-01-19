@@ -1,8 +1,8 @@
 function euclideanDistance(v1, v2){
-  var i;
   var d = 0;
-  for (i = 0; i < v1.length; i++) {
-    d += (v1[i] - v2[i])*(v1[i] - v2[i]);
+  for (var i = 0, n = v1.length; i < n; i++) {
+    var prod = v1[i]-v2[i];
+    d += prod*prod;
   }
   return Math.sqrt(d);
 };
