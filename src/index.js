@@ -249,6 +249,12 @@ var CodeEditor = React.createClass({
       return k(s)
     };
 
+    global.barChart = function(s,k,a,ivs, dvs) {
+      comp.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
+      return k(s)
+    };
+
+
     var job = function() {
 
       var endJob = function(store, returnValue) {
