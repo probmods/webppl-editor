@@ -198,6 +198,15 @@ var wait = function(ms,f) {
   return setTimeout(f,ms);
 }
 
+var ResultDOM = React.createClass({
+  componentDidMount: function() {
+    this.div = ReactDOM.findDOMNode(this);
+  },
+  render: function() {
+    return (<div className="custom"></div>)
+  }
+})
+
 var RunButton = React.createClass({
   getLabel: function() {
     var labels = {
@@ -228,6 +237,13 @@ var CodeEditor = React.createClass({
 
     global.localStorage.setItem('code',this.state.code);
 
+    var $resultsDiv = $(ReactDOM.findDOMNode(this)).find(".result");
+
+    // mitigate dom reflow
+    $resultsDiv.css({
+      'min-height': $resultsDiv.height()
+    })
+
     this.setState({newborn: false, results: []});
     var comp = this;
     var code = this.state.code;
@@ -254,24 +270,36 @@ var CodeEditor = React.createClass({
       return k(s)
     };
 
+    // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
+    global.makeResultContainer = function() {
+      comp.addResult(_.extend({type: 'DOM'}));
+      // return the most recent custom component
+      // TODO: don't depend on jquery for this
+      return _.last( $(ReactDOM.findDOMNode(comp)).find(".custom") );
+    }
+
+    var cleanup = function() {
+      comp.setState({execution: 'idle'})
+
+      $resultsDiv.css({
+        'min-height': 0
+      })
+
+      // remove completed job
+      jobsQueue.shift();
+
+      // if there are remaining jobs, start on the next one
+      if (jobsQueue.length > 0) {
+        jobsQueue[0]()
+      }
+    }
 
     var job = function() {
 
       var endJob = function(store, returnValue) {
-
         var renderedReturnValue = renderReturnValue(returnValue);
-
-        comp.addResult({type: 'text', message: renderedReturnValue })
-
-        comp.setState({execution: 'idle'})
-
-        // remove completed job
-        jobsQueue.shift();
-
-        // if there are remaining jobs, start on the next one
-        if (jobsQueue.length > 0) {
-          jobsQueue[0]()
-        }
+        comp.addResult({type: 'text', message: renderedReturnValue });
+        cleanup();
       }
 
       comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
@@ -285,9 +313,8 @@ var CodeEditor = React.createClass({
           try {
             compileCache[code] = webppl.compile(code, 'verbose');
           } catch (e) {
-            comp.addResult({type: 'error', message: e.message, stack: e.stack})
-            comp.setState({execution: 'idle'});
-            jobsQueue.shift()
+            comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            cleanup();
           }
         }
 
@@ -298,9 +325,8 @@ var CodeEditor = React.createClass({
           try {
             eval.call({}, compileCache[code])({}, endJob, '');
           } catch(e) {
-            comp.addResult({type: 'error', message: e.message, stack: e.stack})
-            comp.setState({execution: 'idle'});
-            jobsQueue.shift()
+            comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            cleanup();
           }
 
         });
@@ -351,6 +377,8 @@ var CodeEditor = React.createClass({
         return <ResultError key={k} {...d} />
       } else if (d.type == 'barChart') {
         return <ResultBarChart key={k} {...d} />
+      } else if (d.type == 'DOM') {
+        return <ResultDOM key={k} {...d} />
       } else {
         console.log('unrouted command: ', d)
       }
