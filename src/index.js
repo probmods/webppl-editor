@@ -230,7 +230,8 @@ var CodeEditor = React.createClass({
       code: this.props.code,
       results: [],
       newborn: true,
-      execution: "idle"
+      execution: "idle",
+      resultDivMinHeight: 0
     }
   },
   runCode: function() {
@@ -238,11 +239,6 @@ var CodeEditor = React.createClass({
     global.localStorage.setItem('code',this.state.code);
 
     var $resultsDiv = $(ReactDOM.findDOMNode(this)).find(".result");
-
-    // mitigate dom reflow
-    $resultsDiv.css({
-      'min-height': $resultsDiv.height()
-    })
 
     this.setState({newborn: false, results: []});
     var comp = this;
@@ -279,11 +275,11 @@ var CodeEditor = React.createClass({
     }
 
     var cleanup = function() {
-      comp.setState({execution: 'idle'})
-
-      $resultsDiv.css({
-        'min-height': 0
-      })
+      comp.setState({execution: 'idle'}, function() {
+        // set resultDivMinHeight with callback because we need to make sure the idle style is applied first
+        // i.e., the css min-height attribute is set to 0 so we can actually measure the height of the div
+        comp.setState({resultDivMinHeight: $resultsDiv.height()})
+      });
 
       // remove completed job
       jobsQueue.shift();
@@ -389,13 +385,17 @@ var CodeEditor = React.createClass({
     // but they might work for our use case (essentially append-only)
     var results = this.state.results.map(function(r,i) { return renderResult(r,i) });
 
+    var resultDivStyle = {
+      minHeight: this.state.execution == 'idle' ? 0 : this.state.resultDivMinHeight
+    }
+
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
       <div ref="cont">
         <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
-        <div className={this.state.newborn ? "result hide" : "result"}>
+        <div style={resultDivStyle} className={this.state.newborn ? "result hide" : "result"}>
           {results}
         </div>
       </div>
