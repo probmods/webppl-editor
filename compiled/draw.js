@@ -1,9 +1,23 @@
+function euclideanDistance(v1, v2){
+  var i;
+  var d = 0;
+  for (i = 0; i < v1.length; i++) {
+    d += (v1[i] - v2[i])*(v1[i] - v2[i]);
+  }
+  return Math.sqrt(d);
+};
+
 function DrawObject(width, height, visible){
   this.canvas = $('<canvas/>', {
     "class": "drawCanvas",
     "Width": width + "px",
     "Height": height + "px"
   })[0];
+  if (visible==true){
+    var container = makeResultContainer()
+    $(container).css({"display": "inline"})
+    $(container).append(this.canvas);
+  };
   this.paper = new paper.PaperScope();
   this.paper.setup(this.canvas);
   this.paper.view.viewSize = new this.paper.Size(width, height);
@@ -84,4 +98,23 @@ DrawObject.prototype.distance = function(cmpDrawObject){
 DrawObject.prototype.destroy = function(){
   this.paper = undefined;
   $(this.canvas).remove();
+}
+
+function Draw(s, k, a, width, height, visible){
+  return k(s, new DrawObject(width, height, visible));
+}
+
+function loadImage(s, k, a, drawObject, url){
+  // Synchronous loading - only continue with computation once image is loaded
+  var context = drawObject.canvas.getContext('2d');
+  var imageObj = new Image();
+  imageObj.onload = function() {
+    var raster = new drawObject.paper.Raster(imageObj);
+    raster.position = drawObject.paper.view.center;
+    drawObject.redraw();
+    var trampoline = k(s);
+    webppl.runTrampoline(trampoline)
+  };
+  imageObj.src = url;
+  return false;
 }
