@@ -213,7 +213,7 @@ var RunButton = React.createClass({
   }
 });
 
-var paperComponents = {};
+var compileCache = {};
 
 var CodeEditor = React.createClass({
   getInitialState: function() {
@@ -242,18 +242,14 @@ var CodeEditor = React.createClass({
     };
 
     global.hist = function(s,k,a,samples) {
-
       var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
       var labels = _(frequencyDict).keys();
       var counts = _(frequencyDict).values();
-
       comp.addResult({type: 'barChart', ivs: labels, dvs: counts})
-
       return k(s)
     };
 
     var job = function() {
-      //comp.setState({execution: 'init'});
 
       var endJob = function(store, returnValue) {
 
@@ -272,17 +268,20 @@ var CodeEditor = React.createClass({
         }
       }
 
-      comp.setState({execution: 'compiling'});
-      wait(20, function() {
+      comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
 
-        var compiled = webppl.compile(code, 'verbose');
+      // use wait() so that runButton dom changes actually appear
+      wait(20, function() {
+        if (!compileCache[code]) {
+          compileCache[code] = webppl.compile(code, 'verbose');
+        }
 
         comp.setState({execution: 'running'});
 
         wait(20, function() {
 
           try {
-            eval.call({}, compiled)({}, endJob, '');
+            eval.call({}, compileCache[code])({}, endJob, '');
           } catch(e) {
             comp.addResult({type: 'error', message: e.message, stack: e.stack})
             comp.setState({execution: 'idle'});
