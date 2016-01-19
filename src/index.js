@@ -279,7 +279,16 @@ var CodeEditor = React.createClass({
       // use wait() so that runButton dom changes actually appear
       wait(20, function() {
         if (!compileCache[code]) {
-          compileCache[code] = webppl.compile(code, 'verbose');
+
+          // catch compilation errors
+          // TODO: better message for returnify
+          try {
+            compileCache[code] = webppl.compile(code, 'verbose');
+          } catch (e) {
+            comp.addResult({type: 'error', message: e.message, stack: e.stack})
+            comp.setState({execution: 'idle'});
+            jobsQueue.shift()
+          }
         }
 
         comp.setState({execution: 'running'});
