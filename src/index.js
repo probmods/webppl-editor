@@ -303,7 +303,7 @@ var CodeEditor = React.createClass({
         // compile code if we need to
         if (!compileCache[code]) {
           try {
-            compileCache[code] = webppl.compile(code, 'verbose');
+            compileCache[code] = webppl.compile(code)
           } catch (e) {
             // TODO: better message for returnify
             comp.addResult({type: 'error', message: e.message, stack: e.stack});
