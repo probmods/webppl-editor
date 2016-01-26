@@ -295,6 +295,7 @@ var CodeEditor = React.createClass({
       var sideEffectMethods = ["print","hist","barChart","makeResultContainer"];
       _.each(sideEffectMethods,
              function(name) { global[name] = comp[name]; });
+      // note: React automatically binds methods to their class so we don't need to use .bind here
 
       comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
 
@@ -388,7 +389,7 @@ var CodeEditor = React.createClass({
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
-      <div ref="cont">
+      <div ref="cont" className="wpedit">
         <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <div style={resultDivStyle} className={this.state.newborn ? "result hide" : "result"}>

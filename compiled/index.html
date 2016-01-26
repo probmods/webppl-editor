@@ -19,31 +19,6 @@
          color: #bfbfbf;
      }
 
-     .CodeMirror-lines {
-         border: 1px solid black;
-         border-radius: 2px;
-     }
-
-     button.run {
-         border: 1px solid gray;
-         font-family: Menlo;
-         background-color: #e0e0e0;
-         margin: 0.5em 0 0.5em 0;
-         padding: 0.5em 1em;
-         min-width: 100px;
-     }
-
-     button.run:hover {
-         cursor: pointer
-     }
-
-     button.run:active {
-         background-color: #a0a0a0;
-     }
-
-     button.run:disabled {
-         cursor: auto;
-     }
 
      #wrapper {
          width: 50%;
@@ -51,23 +26,9 @@
          margin: 0 auto;
      }
 
-     div.CodeMirror span.CodeMirror-matchingbracket {
-         background-color: #e0e0e0;
-     }
-
-     div.CodeMirror span.CodeMirror-nonmatchingbracket {
-         color: black;
-         background-color: #ECAAB9;
-     }
-
      canvas.paper {
          border: 1px solid gray;
      }
-
-     .hidden {
-         display: none;
-     }
-
 
     </style>
     <link rel='stylesheet' type='text/css' href='editor.css'>
@@ -78,6 +39,12 @@
       <pre id="foo"><code>print('start 1');
 hist(repeat(1e5, flip))
 print('end 1')</code></pre>
+
+
+      <pre id="bar"><code>print('start 2');
+hist(repeat(1e5, flip))
+print('end 2')</code></pre>
+
     </div>
 
   </body>
@@ -89,7 +56,7 @@ print('end 1')</code></pre>
   <script>
     var storedCode = localStorage.getItem('code');
     if (storedCode) {
-    $("pre > code").html(storedCode)
+    // $("pre > code").html(storedCode)
     }
 
     // TODO: doesn't seem to work over https

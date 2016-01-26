@@ -1,34 +1,61 @@
-.result {
+.wpedit .CodeMirror-lines {
+    border: 1px solid black;
+    border-radius: 2px;
+}
+
+.wpedit button.run {
+    border: 1px solid gray;
+    font-family: Menlo;
+    background-color: #e0e0e0;
+    margin: 0.5em 0 0.5em 0;
+    padding: 0.5em 1em;
+    min-width: 100px;
+}
+
+.wpedit button.run:hover {
+    cursor: pointer
+}
+
+.wpedit button.run:active {
+    background-color: #a0a0a0;
+}
+
+.wpedit button.run:disabled {
+    cursor: auto;
+}
+
+
+.wpedit .result {
     border: 1px solid gray;
     border-radius: 2px;
     margin: 0.5em 0;
     min-height: 0.5em;
 }
 
-.result pre {
+.wpedit .result pre {
     border: none
 }
 
-pre.error {
+.wpedit pre.error {
     background-color: red;
     color: white;
 }
 
-.error-message {
+.wpedit .error-message {
     font-weight: bold;
     text-decoration: underline;
     cursor: pointer
 }
 
-.stale {
+.wpedit .stale {
     opacity: 0.2
 }
 
-.hide {
+.wpedit .hide {
     display: none
 }
 
-.CodeMirror-foldmarker {
+.wpedit .CodeMirror-foldmarker {
     background-color: #ffffcc;
     border: 1px solid gray;
     border-radius: 4px;
@@ -36,6 +63,20 @@ pre.error {
     padding: 0 0.5em
 }
 
-.CodeMirror-foldmarker:hover {
+.wpedit .CodeMirror-foldmarker:hover {
     cursor: pointer
+}
+
+.wpedit div.CodeMirror span.CodeMirror-matchingbracket {
+    background-color: #e0e0e0;
+}
+
+.wpedit div.CodeMirror span.CodeMirror-nonmatchingbracket {
+    color: black;
+    background-color: #ECAAB9;
+}
+
+
+.wpedit .hidden {
+    display: none;
 }
