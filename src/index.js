@@ -27,14 +27,11 @@ var renderReturnValue = function(x) {
 // this works because node require calls are cached
 var CM = require('react-codemirror/node_modules/codemirror');
 
-// global.CodeMirror = require('codemirror');
-
 var $ = require('jquery');
 
 global.d3 = require('d3'); // debugging
 //var vl = require('vega-lite');
 var vg = require('vega');
-
 
 var _ = require('underscore');
 global._ = _; // debugging
@@ -400,10 +397,6 @@ var CodeEditor = React.createClass({
   }
 });
 
-var setupLiterate = function(el) {
-
-};
-
 var setupCode = function(preEl, options) {
   // converts <pre><code>...</code></pre>
   // to a CodeMirror instance
@@ -426,14 +419,4 @@ var setupCode = function(preEl, options) {
   })
 };
 
-// var makeAbsolutePath = function(relativePath) {
-//   var prefix = _.initial(window.location.href.split('/')).join('/');
-//   return [prefix,'/',relativePath].join('');
-// }
-
-// var isPathRelative = function(path) {
-//   return !(/^(?:\/|[a-z]+:\/\/)/.test(path))
-// }
-
 global.wpCodeEditor = setupCode;
-global.wpLiterateEditor = setupLiterate;
