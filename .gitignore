@@ -1,1 +1,5 @@
 .DS_Store
+npm-debug.log
+compiled/editor.js
+compiled/webppl.js
+node_modules/
