@@ -410,7 +410,7 @@ var setupCode = function(preEl, options) {
   var editorDiv = document.createElement('div');
 
   var r = React.createElement(CodeEditor,
-                              {code: preEl.children[0].innerHTML,
+                              {code: $(preEl.children[0]).text(),
                                language: options.language
                               });
 
