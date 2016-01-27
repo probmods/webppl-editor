@@ -1,8 +1,4 @@
-// get access to the private CM function inside react-codemirror
-// this works because node require calls are cached
-var CodeMirror = require('react-codemirror/node_modules/codemirror');
-
-(function() {
+module.exports = function(CodeMirror) {
   "use strict";
 
   function doFold(cm, pos, options) {
@@ -74,80 +70,82 @@ var CodeMirror = require('react-codemirror/node_modules/codemirror');
       }
     };
   });
-})();
 
-var myRangeFinder = function(cm, start) {
 
-  var line = start.line, lineText = cm.getLine(line);
+  var myRangeFinder = function(cm, start) {
 
-  //if the line has a comment fold, then do that:
-  if (lineText.indexOf("///fold:") != -1) return tripleCommentRangeFinder(cm, start)
+    var line = start.line, lineText = cm.getLine(line);
 
-  return
+    //if the line has a comment fold, then do that:
+    if (lineText.indexOf("///fold:") != -1) return tripleCommentRangeFinder(cm, start)
 
-  //    var startCh, tokenType;
-  //
-  //    //    function findOpening(openCh) {
-  //    //        for (var at = start.ch, pass = 0;;) {
-  //    //            var found = at <= 0 ? -1 : lineText.lastIndexOf(openCh, at - 1);
-  //    //            if (found == -1) {
-  //    //                if (pass == 1) break;
-  //    //                pass = 1;
-  //    //                at = lineText.length;
-  //    //                continue;
-  //    //            }
-  //    //            if (pass == 1 && found < start.ch) break;
-  //    //            tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, found + 1));
-  //    //            if (!/^(comment|string)/.test(tokenType)) return found + 1;
-  //    //            at = found - 1;
-  //    //        }
-  //    //    }
-  //
-  //    var startToken = "(", endToken = ")";
-  //    var startCh = lineText.lastIndexOf("(", start.ch);
-  //    if (startCh == -1) return;
-  //    startCh++;
-  //    tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, startCh));
-  //
-  //    var count = 1, lastLine = cm.lastLine(), end, endCh;
-  //
-  //    outer: for (var i = line; i <= lastLine; ++i) {
-  //        var text = cm.getLine(i), pos = i == line ? startCh : 0;
-  //        for (;;) {
-  //            var nextOpen = text.indexOf(startToken, pos), nextClose = text.indexOf(endToken, pos);
-  //            if (nextOpen < 0) nextOpen = text.length;
-  //            if (nextClose < 0) nextClose = text.length;
-  //            pos = Math.min(nextOpen, nextClose);
-  //            if (pos == text.length) break;
-  //            if (cm.getTokenTypeAt(CodeMirror.Pos(i, pos + 1)) == tokenType) {
-  //                if (pos == nextOpen) ++count;
-  //                else if (!--count) { end = i; endCh = pos; break outer; }
-  //            }
-  //            ++pos;
-  //        }
-  //    }
-  //    if (end == null || line == end && endCh == startCh) return;
-  //    return {from: CodeMirror.Pos(line, startCh),
-  //            to: CodeMirror.Pos(end, endCh)};
-}
+    return
 
-//if we want to fold what's between "///fold:" and "///".
-//assume that start is already the line with "///fold:"
-//so find the next "///" and return the range from start line + 1 to match.
-var tripleCommentRangeFinder = function(cm, start) {
-  var lastLine = cm.lastLine();
-  var pos;
-  for (var i = start.line+1; i<=lastLine; i++) {
-    var text = cm.getLine(i)
-    pos = text.indexOf("///")
-    if (pos==0) {
-      var endCh = cm.getLine(i).length
-      return {from: CodeMirror.Pos(start.line+1, 0), to: CodeMirror.Pos(i, endCh)}; }
+    //    var startCh, tokenType;
+    //
+    //    //    function findOpening(openCh) {
+    //    //        for (var at = start.ch, pass = 0;;) {
+    //    //            var found = at <= 0 ? -1 : lineText.lastIndexOf(openCh, at - 1);
+    //    //            if (found == -1) {
+    //    //                if (pass == 1) break;
+    //    //                pass = 1;
+    //    //                at = lineText.length;
+    //    //                continue;
+    //    //            }
+    //    //            if (pass == 1 && found < start.ch) break;
+    //    //            tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, found + 1));
+    //    //            if (!/^(comment|string)/.test(tokenType)) return found + 1;
+    //    //            at = found - 1;
+    //    //        }
+    //    //    }
+    //
+    //    var startToken = "(", endToken = ")";
+    //    var startCh = lineText.lastIndexOf("(", start.ch);
+    //    if (startCh == -1) return;
+    //    startCh++;
+    //    tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, startCh));
+    //
+    //    var count = 1, lastLine = cm.lastLine(), end, endCh;
+    //
+    //    outer: for (var i = line; i <= lastLine; ++i) {
+    //        var text = cm.getLine(i), pos = i == line ? startCh : 0;
+    //        for (;;) {
+    //            var nextOpen = text.indexOf(startToken, pos), nextClose = text.indexOf(endToken, pos);
+    //            if (nextOpen < 0) nextOpen = text.length;
+    //            if (nextClose < 0) nextClose = text.length;
+    //            pos = Math.min(nextOpen, nextClose);
+    //            if (pos == text.length) break;
+    //            if (cm.getTokenTypeAt(CodeMirror.Pos(i, pos + 1)) == tokenType) {
+    //                if (pos == nextOpen) ++count;
+    //                else if (!--count) { end = i; endCh = pos; break outer; }
+    //            }
+    //            ++pos;
+    //        }
+    //    }
+    //    if (end == null || line == end && endCh == startCh) return;
+    //    return {from: CodeMirror.Pos(line, startCh),
+    //            to: CodeMirror.Pos(end, endCh)};
   }
-  return;
-}
 
-module.exports = {
+  //if we want to fold what's between "///fold:" and "///".
+  //assume that start is already the line with "///fold:"
+  //so find the next "///" and return the range from start line + 1 to match.
+  var tripleCommentRangeFinder = function(cm, start) {
+    var lastLine = cm.lastLine();
+    var pos;
+    for (var i = start.line+1; i<=lastLine; i++) {
+      var text = cm.getLine(i)
+      pos = text.indexOf("///")
+      if (pos==0) {
+        var endCh = cm.getLine(i).length
+        return {from: CodeMirror.Pos(start.line+1, 0), to: CodeMirror.Pos(i, endCh)}; }
+    }
+    return;
+  }
+
+  return {
     tripleCommentRangeFinder: tripleCommentRangeFinder,
     myRangeFinder: myRangeFinder
-}
+  }
+  
+};

@@ -1,9 +1,30 @@
 'use strict';
 
+var $ = require('jquery');
+
+var _ = require('underscore');
+global._ = _;  // debugging
+
 var React = require('react');
 var ReactDOM = require('react-dom');
-
+var CodeMirror = require('codemirror');
 var CodeMirrorComponent = require('react-codemirror');
+var Folding = require('./folding')(CodeMirror);
+
+var d3 = require('d3');
+if (typeof window !== "undefined") {
+  window.d3 = d3;
+}
+if (typeof global !== "undefined") {
+  global.d3 = d3;
+}
+
+var vg = require('vega');
+
+require('codemirror/addon/edit/matchbrackets')
+require('codemirror/mode/javascript/javascript');
+require('codemirror/addon/comment/comment'); // installs toggleComment
+
 
 var renderReturnValue = function(x) {
   if (x === undefined) {
@@ -22,23 +43,6 @@ var renderReturnValue = function(x) {
 
   return JSON.stringify(x);
 };
-
-// get access to the private CM function inside react-codemirror
-// this works because node require calls are cached
-var CM = require('react-codemirror/node_modules/codemirror');
-
-var $ = require('jquery');
-
-global.d3 = require('d3'); // debugging
-//var vl = require('vega-lite');
-var vg = require('vega');
-
-var _ = require('underscore');
-global._ = _; // debugging
-
-require('react-codemirror/node_modules/codemirror/addon/edit/matchbrackets')
-require('react-codemirror/node_modules/codemirror/mode/javascript/javascript');
-require('react-codemirror/node_modules/codemirror/addon/comment/comment'); // installs toggleComment
 
 var ResultError = React.createClass({
   getInitialState: function() {
@@ -346,7 +350,7 @@ var CodeEditor = React.createClass({
     });
   },
   render: function() {
-    var myRangeFinder = require('./folding').myRangeFinder;
+    var myRangeFinder = Folding.myRangeFinder;
 
     var options = {
       mode: 'javascript',
@@ -387,7 +391,7 @@ var CodeEditor = React.createClass({
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
       <div ref="cont" className="wpedit">
-        <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} />
+        <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <div style={resultDivStyle} className={this.state.newborn ? "result hide" : "result"}>
           {results}
