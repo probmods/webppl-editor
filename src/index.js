@@ -358,9 +358,9 @@ var CodeEditor = React.createClass({
       matchBrackets: true,
       viewportMargin: Infinity,
       extraKeys: {
+        "Tab": "indentAuto",
         "Cmd-/": "toggleComment",
         "Cmd-.": function(cm){cm.foldCode(cm.getCursor(), myRangeFinder); }
-
       }
     };
 
