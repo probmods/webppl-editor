@@ -32,6 +32,10 @@
 
     </style>
     <link rel='stylesheet' type='text/css' href='editor.css'>
+    <script src="editor.js"></script>
+    <script src="jquery.js"></script>
+    <script src="paper.js"></script>
+    <script src="draw.js"></script>
   </head>
   <body>
     <div id="wrapper">
@@ -48,17 +52,14 @@ print('end 2')</code></pre>
     </div>
 
   </body>
-  <script src="webppl.js"></script>
-  <script src="editor.js"></script>
-  <script src="jquery.js"></script>
-  <script src="paper.js"></script>
-  <script src="draw.js"></script>
   <script>
-    var storedCode = localStorage.getItem('code');
-    if (storedCode) {
-    // $("pre > code").html(storedCode)
-    }
+   var storedCode = localStorage.getItem('code');
+   if (storedCode) {
+       // $("pre > code").html(storedCode)
+   }
 
-    $("pre").map(function(i,el) { wpCodeEditor(el, {language: 'webppl'}); })
+   $("pre").map(function(i,el) { wpCodeEditor(el, {language: 'webppl'}); })
   </script>
+
+  <script src="webppl.js" defer></script>
 </html>

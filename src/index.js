@@ -292,6 +292,12 @@ var CodeEditor = React.createClass({
 
     var job = function() {
 
+      // if webppl hasn't loaded yet, wait 250ms before trying again
+      if (typeof webppl == 'undefined') {
+        comp.setState({execution: 'loading webppl'})
+        return wait(250, job);
+      }
+
       // inject this component's side effect methods into global
       var sideEffectMethods = ["print","hist","barChart","makeResultContainer"];
       _.each(sideEffectMethods,
