@@ -37,15 +37,95 @@
   </head>
   <body>
     <div id="wrapper">
-      <h2>foo</h2>
+      <b>histogram</b>:
       <pre id="foo"><code>print('start 1');
 hist(repeat(1e5, flip))
 print('end 1')</code></pre>
 
-
-      <pre id="bar"><code>print('start 2');
+      <b>tricky reference error</b>:
+      <pre id="tricky-reference-error"><code>print('started');
 hist(repeat(1e5, flip))
-print('end 2')</code></pre>
+tricky
+print('ended')</code></pre>
+
+      <b>dippl.org computer vision example:</b>
+      <pre id="dippl-cv-beach"><code>///fold:
+var targetImage = Draw(50, 50, true);
+loadImage(targetImage, "beach.png")
+
+var uniformDraw = function(xs){
+  var i = randomInteger(xs.length);
+  return xs[i];
+}
+
+var drawLines = function(drawObj, lines){
+  var line = lines[0];
+  drawObj.line(line[0], line[1], line[2], line[3], line[4], line[5], line[6]);
+  if (lines.length !== 1) {
+    drawLines(drawObj, lines.slice(1));
+  }
+}
+
+var randomStrokeWidth = function(){
+  var widths = [2, 4, 8, 16];
+  return uniformDraw(widths);
+}
+
+var randomOpacity = function(){
+  var opacities = [0, 0.2, .5];
+  return uniformDraw(opacities);
+}
+
+var _getRandomColor = function(i) {
+  if (i == 0){
+    return "";
+  } else {
+    // var letters = '0123456789ABCDEF'.split('');
+    var color = '#';
+    return uniformDraw('04AF') + _getRandomColor(i-1);
+  }
+}
+
+var randomColor = function(){
+  return "#" + _getRandomColor(6);
+}
+
+var makeLines = function(n, lines){
+  var x1 = randomInteger(50);
+  var y1 = randomInteger(50);
+  var x2 = randomInteger(50);
+  var y2 = y1;
+  var strokeWidth = randomStrokeWidth();
+  var opacity = randomOpacity();
+  var color = randomColor();
+  var newLines = lines.concat([[x1, y1, x2, y2, strokeWidth, opacity, color]]);
+  return (n==1) ? newLines : makeLines(n-1, newLines);
+}
+///
+
+var counter = [];
+
+MH(
+  function(){
+    var lines = makeLines(8, []);
+
+
+    var showOutputImage = (counter.length % 100 == 0);
+    var finalGeneratedImage = Draw(50, 50, showOutputImage);
+
+    drawLines(finalGeneratedImage, lines);
+    var newScore = -targetImage.distance(finalGeneratedImage)/1000; // Increase to 10000 to see more diverse samples
+
+	if (!showOutputImage) {
+      finalGeneratedImage.destroy()
+    }
+
+    factor(newScore);
+
+    counter.push(1);
+
+    return lines
+   }, 2500);</code></pre>
 
     </div>
 
