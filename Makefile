@@ -1,3 +1,8 @@
+all : compiled/editor.css compiled/editor.js
+
+compiled/editor.css : src/component.css src/codemirror-5.10.0.css
+	@cat src/component.css src/codemirror-5.10.0.css > compiled/editor.css
+
 compiled/editor.js : src/index.js
 	@browserify -t [ babelify --presets [ react ] ] "$<" > "$@"
 
