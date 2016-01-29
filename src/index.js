@@ -276,6 +276,7 @@ var CodeEditor = React.createClass({
     }
 
     var cleanup = function() {
+      window.onerror = null;
       comp.setState({execution: 'idle'}, function() {
         // set resultDivMinHeight with callback because we need to make sure the idle style is applied first
         // i.e., the css min-height attribute is set to 0 so we can actually measure the height of the div
@@ -322,6 +323,13 @@ var CodeEditor = React.createClass({
         comp.setState({execution: 'running'});
 
         wait(20, function() {
+          // catch errors that try-catch can't because of trampoline pauses
+          // there is some redundancy here but leave it for now
+          window.onerror = function(message,url,lineNumber,colNumber,e) {
+            comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            cleanup();
+          }
+
           try {
             eval.call({}, compileCache[code])({}, endJob, '');
           } catch(e) {
