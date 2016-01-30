@@ -1,3 +1,5 @@
+**Note: work in progress**
+
 A Javascript library that provides an in-browser editor for WebPPL
 
 Usage:
@@ -8,7 +10,6 @@ Usage:
 <meta charset="UTF-8"> <!-- editor.js contains unicode, and we need to tell the browser this -->
 <script src="webppl.js"></script> <!-- compiled webppl library; build from https://github.com/probmods/webppl -->
 <script src="editor.js"></script>
-<link rel="stylesheet" href="codemirror-5.8.0.css">
 <link rel="stylesheet" href="editor.css">
 </head>
 <body>
@@ -25,15 +26,11 @@ preEls.map(function(el) { wpCodeEditor(el, {language: 'webppl'}); });
 Compiling:
 
 ```sh
-make compiled/editor.js
+make all
 ```
 
-Watchified compiling (incrementally rebuilds after source files have updated):
+Watchified compiling (incrementally rebuilds after source files have updated, only works for js, not css):
 
 ```sh
 make watch
 ```
-
-TODO:
-
-- Merge codemirror css file with editor.css
