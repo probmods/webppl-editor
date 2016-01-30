@@ -251,13 +251,14 @@ var CodeEditor = React.createClass({
     this.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
     return k(s)
   },
-  makeResultContainer: function() {
+  makeResultContainer: function(s, k, a) {
     // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
     this.addResult(_.extend({type: 'DOM'}));
 
     // return the most recent custom component
     // TODO: don't depend on jquery for this
-    return _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
+    var element _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
+    return k(s, element);
   },
   // ------------------------------------------------------------
   runCode: function() {
