@@ -257,7 +257,7 @@ var CodeEditor = React.createClass({
 
     // return the most recent custom component
     // TODO: don't depend on jquery for this
-    var element _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
+    var element = _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
     return k(s, element);
   },
   // ------------------------------------------------------------
