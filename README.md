@@ -1,3 +1,5 @@
+**Note: work in progress**
+
 A Javascript library that provides an in-browser editor for WebPPL
 
 Usage:
