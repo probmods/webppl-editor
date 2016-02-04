@@ -1,6 +1,6 @@
 **Note: work in progress**
 
-A Javascript library that provides an in-browser editor for WebPPL
+A browser-based code editor for WebPPL.
 
 Usage:
 
@@ -18,10 +18,15 @@ Usage:
 <script>
 // find all <pre> elements and set up the editor on them
 var preEls = Array.prototype.slice.call(document.querySelectorAll("pre"));
-preEls.map(function(el) { wpCodeEditor(el, {language: 'webppl'}); });
+preEls.map(function(el) { wpEditor.setup(el, {language: 'webppl'}); });
 </script>
 </html>
 ```
+
+The library installs a single object, `wpEditor`, into the global namespace. `wpEditor` contains these methods:
+
+- `setup`: a function for turning a DOM element into an editor
+- `makeResultContainer`: a function used to insert custom objects into the results part of the editor
 
 Compiling:
 

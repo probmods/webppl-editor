@@ -14,7 +14,7 @@ function DrawObject(width, height, visible){
     "Height": height + "px"
   })[0];
   if (visible==true){
-    var container = makeResultContainer()
+    var container = wpEditor.makeResultContainer()
     $(container).css({"display": "inline"})
     $(container).append(this.canvas);
   };

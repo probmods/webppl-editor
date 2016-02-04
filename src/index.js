@@ -251,14 +251,14 @@ var CodeEditor = React.createClass({
     this.addResult({type: 'barChart', ivs: ivs, dvs: dvs});
     return k(s)
   },
-  makeResultContainer: function(s, k, a) {
+  makeResultContainer: function() {
     // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
     this.addResult(_.extend({type: 'DOM'}));
 
     // return the most recent custom component
     // TODO: don't depend on jquery for this
     var element = _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
-    return k(s, element);
+    return element;
   },
   // ------------------------------------------------------------
   runCode: function() {
@@ -301,10 +301,12 @@ var CodeEditor = React.createClass({
       }
 
       // inject this component's side effect methods into global
-      var sideEffectMethods = ["print","hist","barChart","makeResultContainer"];
+      var sideEffectMethods = ["print","hist","barChart"];
       _.each(sideEffectMethods,
              function(name) { global[name] = comp[name]; });
       // note: React automatically binds methods to their class so we don't need to use .bind here
+
+      globalExport['makeResultContainer'] = comp['makeResultContainer'];
 
       comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
 
@@ -438,4 +440,9 @@ var setupCode = function(preEl, options) {
   })
 };
 
-global.wpCodeEditor = setupCode;
+var globalExport = {
+  setup: setupCode,
+  makeResultContainer: function() {} // this gets set by a CodeEditor instance
+}
+
+global.wpEditor = globalExport;
