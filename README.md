@@ -1,6 +1,6 @@
 **Note: work in progress**
 
-A browser-based code editor for WebPPL.
+A browser-based code editor for WebPPL (requires version 0.6.1 or higher)
 
 Usage:
 
