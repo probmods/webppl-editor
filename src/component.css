@@ -2,14 +2,11 @@
 
 .wpedit .CodeMirror {
     height: auto;
+    border: 1px solid black;
+    border-radius: 2px;
 }
 .wpedit .CodeMirror-scroll {
     height: auto;
-}
-
-.wpedit .CodeMirror-lines {
-    border: 1px solid black;
-    border-radius: 2px;
 }
 
 .wpedit button {
