@@ -446,6 +446,15 @@ var setupCode = function(preEl, options) {
     requestAnimationFrame(function() {
       parentDiv.replaceChild(editorDiv, preEl);
       cm.refresh();
+
+      // fold lines marked by "///fold"
+      var lastLine = cm.lastLine();
+      for(var i=0;i<=lastLine;i++) {
+        var txt = cm.getLine(i),
+            pos = txt.indexOf("///fold:");
+        if (pos==0) {cm.foldCode(CodeMirror.Pos(i,pos), Folding.tripleCommentRangeFinder);}
+      }
+
     })
   })
 };
