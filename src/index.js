@@ -469,16 +469,18 @@ var globalExport = {
   setup: setupCode,
   makeResultContainer: function() {}, // this gets set by a CodeEditor instance
   MCMCProgress: function() {
-    var container = globalExport['makeResultContainer']();
-    $(container).addClass('progress');
+    var container = globalExport['makeResultContainer'](),
+        $container = $(container).addClass('progress'),
+        $fill = $('<div>').addClass('fill'),
+        $text = $('<div>').addClass('text');
+    $container.append($fill, $text);
+
     var completed = 0, total;
 
     var renderProgressBar = _.throttle(function() {
       var pct = (100 * completed / total);
-      console.log('called');
-      $(container)
-        .css('background','linear-gradient(to right, #99ccff 0%,#99ccff ' + pct + '%,#ffffff ' + pct + '%)')
-        .text(completed + ' / ' + total + ' samples')
+      $text.text(completed + ' / ' + total + ' samples');
+      $fill.css('width',pct + '%')
     }, 100);
 
     return {
