@@ -48,6 +48,10 @@ hist(repeat(1e5, flip))
 tricky
 print('ended')</code></pre>
 
+      <b>MCMC callback:</b>
+      <pre><code>var model = function() { return gaussian(0,1) };
+MCMC(model, { samples: 1e5, callbacks: [wpEditor.MCMCProgress()]});</code></pre>
+
       <b>dippl.org computer vision example:</b>
       <pre id="dippl-cv-beach"><code>///fold:
 var targetImage = Draw(50, 50, true);

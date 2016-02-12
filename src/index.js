@@ -461,7 +461,25 @@ var setupCode = function(preEl, options) {
 
 var globalExport = {
   setup: setupCode,
-  makeResultContainer: function() {} // this gets set by a CodeEditor instance
+  makeResultContainer: function() {}, // this gets set by a CodeEditor instance
+  MCMCProgress: function() {
+    var container = globalExport['makeResultContainer']();
+    $(container).addClass('progress');
+    var completed = 0, total;
+    return {
+      setup: function(n) {
+        total = n;
+      },
+      iteration: function(trace) {
+        completed += 1;
+        var pct = Math.floor(100 * completed / total)
+        $(container)
+          .css('background','linear-gradient(to right, #99ccff 0%,#99ccff ' + pct + '%,#ffffff ' + pct + '%)')
+          .text(completed + ' / ' + total + ' samples')
+
+      }
+    }
+  }
 }
 
 global.wpEditor = globalExport;
