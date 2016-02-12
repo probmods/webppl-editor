@@ -337,7 +337,11 @@ var CodeEditor = React.createClass({
           // catch errors that try-catch can't because of trampoline pauses
           // there is some redundancy here but leave it for now
           window.onerror = function(message,url,lineNumber,colNumber,e) {
-            comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            if (e) {
+              comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            } else {
+              comp.addResult({type: 'error', message: message, })
+            }
             cleanup();
           }
 
@@ -459,6 +463,8 @@ var setupCode = function(preEl, options) {
   })
 };
 
+global.faf = [];
+
 var globalExport = {
   setup: setupCode,
   makeResultContainer: function() {}, // this gets set by a CodeEditor instance
@@ -466,17 +472,22 @@ var globalExport = {
     var container = globalExport['makeResultContainer']();
     $(container).addClass('progress');
     var completed = 0, total;
+
+    var renderProgressBar = _.throttle(function() {
+      var pct = (100 * completed / total);
+      console.log('called');
+      $(container)
+        .css('background','linear-gradient(to right, #99ccff 0%,#99ccff ' + pct + '%,#ffffff ' + pct + '%)')
+        .text(completed + ' / ' + total + ' samples')
+    }, 100);
+
     return {
       setup: function(n) {
         total = n;
       },
       iteration: function(trace) {
         completed += 1;
-        var pct = Math.floor(100 * completed / total)
-        $(container)
-          .css('background','linear-gradient(to right, #99ccff 0%,#99ccff ' + pct + '%,#ffffff ' + pct + '%)')
-          .text(completed + ' / ' + total + ' samples')
-
+        renderProgressBar();
       }
     }
   }

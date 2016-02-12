@@ -2,7 +2,6 @@
 
 .wpedit .progress {
     font-size: 11px;
-    transition: background 0.1s ease;
 }
 
 .wpedit .CodeMirror {
