@@ -340,7 +340,7 @@ var CodeEditor = React.createClass({
             if (e) {
               comp.addResult({type: 'error', message: e.message, stack: e.stack});
             } else {
-              comp.addResult({type: 'error', message: message, })
+              comp.addResult({type: 'error', message: message})
             }
             cleanup();
           }
