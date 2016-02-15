@@ -463,8 +463,6 @@ var setupCode = function(preEl, options) {
   })
 };
 
-global.faf = [];
-
 var globalExport = {
   setup: setupCode,
   makeResultContainer: function() {}, // this gets set by a CodeEditor instance
