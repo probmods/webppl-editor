@@ -3,7 +3,6 @@
 var $ = require('jquery');
 
 var _ = require('underscore');
-global._ = _;  // debugging
 
 var React = require('react');
 var ReactDOM = require('react-dom');
@@ -11,6 +10,7 @@ var CodeMirror = require('codemirror');
 var CodeMirrorComponent = require('react-codemirror');
 var Folding = require('./folding')(CodeMirror);
 
+// TODO: eliminate once webppl-viz stabilizes
 var d3 = require('d3');
 if (typeof window !== "undefined") {
   window.d3 = d3;
@@ -50,9 +50,6 @@ var ResultError = React.createClass({
   handleClick: function(e) {
     this.setState({showStack: !this.state.showStack})
   },
-  // shouldComponentUpdate: function() {
-  //   return false
-  // },
   render: function() {
     var stack = this.state.showStack ? "\n" + this.props.stack : "";
     return (
