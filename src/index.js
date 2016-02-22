@@ -25,7 +25,6 @@ require('codemirror/addon/edit/matchbrackets')
 require('codemirror/mode/javascript/javascript');
 require('codemirror/addon/comment/comment'); // installs toggleComment
 
-
 var renderReturnValue = function(x) {
   if (x === undefined) {
     return ""
@@ -244,8 +243,8 @@ var ResultList = React.createClass({
       }
     };
 
-    // TODO: in general, numeric index based keys aren't recommended
-    // but they might work for our use case (essentially append-only)
+    // in general, numeric index keys aren't recommended
+    // but i think they work for our use case (append-only, essentially)
     var list = this.props.list.map(function(r,i) { return renderResult(r,i) });
 
     var resultDivStyle = {
