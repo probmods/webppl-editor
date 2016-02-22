@@ -438,7 +438,7 @@ var CodeEditor = React.createClass({
       <div ref="cont" className="wpedit">
         <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
-        <button className = {_.contains(['running','queued'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
+        <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
         <ResultList newborn={this.state.newborn} ref="resultList" executionState={this.state.execution} list={this.state.results} />
       </div>
     );
