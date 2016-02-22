@@ -7,8 +7,8 @@ Usage:
 ```html
 <html>
 <head>
-<meta charset="UTF-8"> <!-- editor.js contains unicode, and we need to tell the browser this -->
-<script src="webppl.js"></script> <!-- compiled webppl library; build from https://github.com/probmods/webppl -->
+<meta charset="UTF-8"> <!-- tell the browser that editor.js contains unicode -->
+<script src="webppl.js"></script> <!-- compiled webppl library; get this from https://github.com/probmods/webppl -->
 <script src="editor.js"></script>
 <link rel="stylesheet" href="editor.css">
 </head>
