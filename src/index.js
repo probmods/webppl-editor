@@ -222,14 +222,51 @@ var RunButton = React.createClass({
 var jobsQueue = [];
 var compileCache = {};
 
+var ResultList = React.createClass({
+  getInitialState: function() {
+    return {
+      resultDivMinHeight: 0
+    }
+  },
+  render: function() {
+    var renderResult = function(d,k) {
+      if (d.type == 'text') {
+        return <ResultText key={k} {...d} />
+      } else if (d.type == 'error') {
+        return <ResultError key={k} {...d} />
+      } else if (d.type == 'barChart') {
+        return <ResultBarChart key={k} {...d} />
+      } else if (d.type == 'DOM') {
+        return <ResultDOM key={k} {...d} />
+      } else {
+        console.log('unrouted command: ', d)
+        return null;
+      }
+    };
+
+    // TODO: in general, numeric index based keys aren't recommended
+    // but they might work for our use case (essentially append-only)
+    var list = this.props.list.map(function(r,i) { return renderResult(r,i) });
+
+    var resultDivStyle = {
+      minHeight: this.props.executionState == 'idle' ? 0 : this.state.resultDivMinHeight
+    }
+
+    return (<div style={resultDivStyle} className={this.props.newborn ? "result hide" : "result"}>
+            {list}
+            </div>);
+
+  }
+})
+
+
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
       code: this.props.code,
       results: [],
       newborn: true,
-      execution: "idle",
-      resultDivMinHeight: 0
+      execution: "idle"
     }
   },
   // side effects
@@ -268,7 +305,7 @@ var CodeEditor = React.createClass({
     this.endJob();
   },
   runCode: function() {
-    global.localStorage.setItem('code',this.state.code);
+    global.localStorage.setItem('code',this.state.code); // TODO: enable only in dev mode
     var $resultsDiv = $(ReactDOM.findDOMNode(this)).find(".result");
 
     this.setState({newborn: false, results: []});
@@ -289,7 +326,7 @@ var CodeEditor = React.createClass({
       comp.setState({execution: 'idle'}, function() {
         // set resultDivMinHeight with callback because we need to make sure the idle style is applied first
         // i.e., the css min-height attribute is set to 0 so we can actually measure the height of the div
-        comp.setState({resultDivMinHeight: $resultsDiv.height()})
+        comp.refs['resultList'].setState({resultDivMinHeight: $resultsDiv.height()})
       });
 
       // remove completed job
@@ -346,6 +383,7 @@ var CodeEditor = React.createClass({
           }
 
           try {
+            // TODO: supply our own runner that is parameterized by error handler?
             var _code = eval.call({}, compileCache[code])(util.trampolineRunners.web);
             _code({}, endJob, '');
           } catch(e) {
@@ -394,29 +432,6 @@ var CodeEditor = React.createClass({
       }
     };
 
-    var renderResult = function(d,k) {
-      if (d.type == 'text') {
-        return <ResultText key={k} {...d} />
-      } else if (d.type == 'error') {
-        return <ResultError key={k} {...d} />
-      } else if (d.type == 'barChart') {
-        return <ResultBarChart key={k} {...d} />
-      } else if (d.type == 'DOM') {
-        return <ResultDOM key={k} {...d} />
-      } else {
-        console.log('unrouted command: ', d)
-      }
-
-    };
-
-    // TODO: in general, numeric index based keys aren't recommended
-    // but they might work for our use case (essentially append-only)
-    var results = this.state.results.map(function(r,i) { return renderResult(r,i) });
-
-    var resultDivStyle = {
-      minHeight: this.state.execution == 'idle' ? 0 : this.state.resultDivMinHeight
-    }
-
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
@@ -424,9 +439,7 @@ var CodeEditor = React.createClass({
         <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running','queued'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
-        <div style={resultDivStyle} className={this.state.newborn ? "result hide" : "result"}>
-          {results}
-        </div>
+        <ResultList newborn={this.state.newborn} ref="resultList" executionState={this.state.execution} list={this.state.results} />
       </div>
     );
   }
@@ -458,7 +471,6 @@ var setupCode = function(preEl, options) {
             pos = txt.indexOf("///fold:");
         if (pos==0) {cm.foldCode(CodeMirror.Pos(i,pos), Folding.tripleCommentRangeFinder);}
       }
-
     })
   })
 };
