@@ -52,6 +52,14 @@ print('ended')</code></pre>
       <pre><code>var model = function() { return gaussian(0,1) };
 MCMC(model, { samples: 1e6, callbacks: [wpEditor.MCMCProgress()]});</code></pre>
 
+      <b>Work across boxes 1 - store an inference result:</b>
+      <pre><code>var posterior = ParticleFilter(function() { return gaussian(0,1) },100);
+wpEditor.set(posterior, 'n(0,1):100')</code></pre>
+
+      <b>Work across boxes 2 - post-processing an inference result:</b>
+      <pre><code>var posterior = wpEditor.get('n(0,1):100');
+_.max(posterior.support())</code></pre>
+
       <b>dippl.org computer vision example:</b>
       <pre id="dippl-cv-beach"><code>///fold:
 var targetImage = Draw(50, 50, true);
@@ -135,11 +143,6 @@ MH(
 
   </body>
   <script>
-   var storedCode = localStorage.getItem('code');
-   if (storedCode) {
-       // $("pre > code").html(storedCode)
-   }
-
    $("pre").map(function(i,el) { wpEditor.setup(el, {language: 'webppl'}); })
   </script>
 

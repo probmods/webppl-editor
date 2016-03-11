@@ -481,6 +481,9 @@ var setupCode = function(preEl, options) {
   })
 };
 
+var numTopStoreKeys = 0;
+
+var topStore = {};
 var globalExport = {
   setup: setupCode,
   makeResultContainer: function() {}, // this gets set by a CodeEditor instance
@@ -507,6 +510,26 @@ var globalExport = {
         completed += 1;
         renderProgressBar();
       }
+    }
+  },
+  set: function(item, key) {
+    if (!key) {
+      numTopStoreKeys++;
+      key = 'r' + numTopStoreKeys;
+    }
+    topStore[key] = item;
+    var div = globalExport.makeResultContainer();
+    $(div).html('Stored item with key <span style="border: 1px solid gray; background-color: #dddddd; border-radius: 5px; padding: 0em 0.5em">' + key + '</b>').css({
+      "font-size": "12px",
+      "padding": "2px"
+    });
+  },
+  get: function(k) {
+    if (k) {
+      return topStore[k]
+    } else {
+      // when called with no argument, returns backing dictionary
+      return topStore;
     }
   }
 }
