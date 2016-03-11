@@ -221,7 +221,7 @@ var compileCache = {};
 var ResultList = React.createClass({
   getInitialState: function() {
     return {
-      resultDivMinHeight: 0
+      minHeight: 0
     }
   },
   render: function() {
@@ -244,11 +244,11 @@ var ResultList = React.createClass({
     // but i think they work for our use case (append-only, essentially)
     var list = this.props.list.map(function(r,i) { return renderResult(r,i) });
 
-    var resultDivStyle = {
-      minHeight: this.props.executionState == 'idle' ? 0 : this.state.resultDivMinHeight
+    var style = {
+      minHeight: this.props.executionState == 'idle' ? 0 : this.state.minHeight
     }
 
-    return (<div style={resultDivStyle} className={this.props.newborn ? "result hide" : "result"}>
+    return (<div style={style} className={this.props.newborn ? "result hide" : "result"}>
             {list}
             </div>);
 
@@ -301,10 +301,20 @@ var CodeEditor = React.createClass({
     this.endJob();
   },
   runCode: function() {
-    global.localStorage.setItem('code',this.state.code); // TODO: enable only in dev mode
-    var $resultsDiv = $(ReactDOM.findDOMNode(this)).find(".result");
+    // TODO: detect resultDivStyle minHeight here
+
+    var resultList = this.refs.resultList;
+    var $resultsDiv = $(ReactDOM.findDOMNode(resultList));
+
+    resultList.setState(function(state,props) {
+      console.log('setting minheight to be ' + $resultsDiv.height())
+      return _.extend({}, state, {minHeight: $resultsDiv.height()})
+    })
+
+    // global.localStorage.setItem('code',this.state.code); // TODO: enable only in dev mode
 
     this.setState({newborn: false, results: []});
+
     var comp = this;
     var code = this.state.code;
     var language = this.props.language; // TODO: detect this from CodeMirror text
@@ -320,9 +330,9 @@ var CodeEditor = React.createClass({
     var cleanup = function() {
       window.onerror = null;
       comp.setState({execution: 'idle'}, function() {
-        // set resultDivMinHeight with callback because we need to make sure the idle style is applied first
+        // set resultList minHeight with callback because we need to make sure the idle style is applied first
         // i.e., the css min-height attribute is set to 0 so we can actually measure the height of the div
-        comp.refs['resultList'].setState({resultDivMinHeight: $resultsDiv.height()})
+        //comp.refs['resultList'].setState({minHeight: $resultsDiv.height()})
       });
 
       // remove completed job
