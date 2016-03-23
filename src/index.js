@@ -271,8 +271,14 @@ var CodeEditor = React.createClass({
   // TODO: remove hist and barChart once webppl-viz stabilizes
   // ------------------------------------------------------------
   print: function(s,k,a,x) {
-    this.addResult({type: 'text', message: x})
-    return k(s)
+    // if x has a custom printer, use it
+    if (x.__print__) {
+      return k(s, x.__print__(x));
+    } else {
+      this.addResult({type: 'text',
+                      message: typeof x == 'object' ? JSON.stringify(x) : x})
+      return k(s)
+    }
   },
   hist: function(s,k,a,samples) {
     var frequencyDict = _(samples).countBy(function(x) { return typeof x === 'string' ? x : JSON.stringify(x) });
