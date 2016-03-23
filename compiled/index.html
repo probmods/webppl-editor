@@ -139,11 +139,27 @@ MH(
     return lines
    }, 2500);</code></pre>
 
+      <b>Vanilla JS:</b>
+      <pre><code>// language: javascript
+
+[1,2,3].map(function(x) { return x + 1 })</code></pre>
     </div>
 
   </body>
   <script>
-   $("pre").map(function(i,el) { wpEditor.setup(el, {language: 'webppl'}); })
+   var getLanguage = function(code){
+       var firstLine = code.split("\n")[0];
+       console.log(firstLine)
+    if (firstLine == "// language: javascript") {
+      return "javascript";
+    } else {
+      return "webppl";
+    }
+  };
+
+   $("pre").map(function(i,el) {
+       wpEditor.setup(el, {language: getLanguage($(el).text())})
+   })
   </script>
 
   <script src="webppl.js" defer></script>

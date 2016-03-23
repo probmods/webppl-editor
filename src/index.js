@@ -351,6 +351,18 @@ var CodeEditor = React.createClass({
 
     var job = function() {
 
+      // run vanilla js
+      if (language == 'javascript') {
+        // TODO: grey out the run button but don't show a cancel button
+        try {
+          var res = eval(code);
+          endJob({}, eval(code));
+        } catch(e) {
+          comp.addResult({type: 'error', message: e.message, stack: e.stack});
+          cleanup();
+        }
+      }
+
       // if webppl hasn't loaded yet, wait 250ms before trying again
       if (typeof webppl == 'undefined') {
         comp.setState({execution: 'loading webppl'})
