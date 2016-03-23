@@ -30,7 +30,7 @@ The library installs a single object, `wpEditor`, into the global namespace. `wp
 - `setup`: a function for turning a DOM element into an editor
 - `makeResultContainer`: a function used to insert custom objects into the results part of the editor
 - `put([key,] object)`: used for working across multiple code boxes. Stores an object (using an optional key) for use in other code boxes. If no key is specified, you'll get an automatically generated one.
-- `get(key)`: retrieves the object with key `key`.
+- `get([key])`: retrieves the object with key `key`. When called with no key, returns the entire store.
 
 Compiling:
 
