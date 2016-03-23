@@ -2,6 +2,8 @@
 
 A browser-based code editor for WebPPL (requires version 0.6.1 or higher)
 
+Demo: https://web.stanford.edu/~louyang/wp-editor/compiled/index.html
+
 Usage:
 
 ```html
