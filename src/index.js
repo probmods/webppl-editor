@@ -512,7 +512,14 @@ var globalExport = {
       }
     }
   },
-  set: function(item, key) {
+  put: function() {
+    var item, key;
+    if (arguments.length == 1) {
+      item = arguments[0];
+    } else {
+      key = arguments[0];
+      item = arguments[1];
+    }
     if (!key) {
       numTopStoreKeys++;
       key = 'r' + numTopStoreKeys;

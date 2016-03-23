@@ -54,7 +54,7 @@ MCMC(model, { samples: 1e6, callbacks: [wpEditor.MCMCProgress()]});</code></pre>
 
       <b>Work across boxes 1 - store an inference result:</b>
       <pre><code>var posterior = ParticleFilter(function() { return gaussian(0,1) },100);
-wpEditor.set(posterior, 'n(0,1):100')</code></pre>
+wpEditor.put('n(0,1):100', posterior)</code></pre>
 
       <b>Work across boxes 2 - post-processing an inference result:</b>
       <pre><code>var posterior = wpEditor.get('n(0,1):100');
