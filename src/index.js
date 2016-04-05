@@ -245,7 +245,7 @@ var ResultList = React.createClass({
     var list = this.props.list.map(function(r,i) { return renderResult(r,i) });
 
     var style = {
-      minHeight: this.props.executionState == 'idle' ? 0 : this.state.minHeight
+      minHeight: this.state.minHeight
     }
 
     return (<div style={style} className={this.props.newborn ? "result hide" : "result"}>
@@ -307,17 +307,20 @@ var CodeEditor = React.createClass({
     this.endJob();
   },
   runCode: function() {
-    // TODO: detect resultDivStyle minHeight here
 
     var resultList = this.refs.resultList;
     var $resultsDiv = $(ReactDOM.findDOMNode(resultList));
 
+    // set the minimum height property for the result list
+    // to be its current height so that we don't have the janky reflow
+    // of it shrinking because it's empty and growing again as
+    // results populate
     resultList.setState(function(state,props) {
-      console.log('setting minheight to be ' + $resultsDiv.height())
       return _.extend({}, state, {minHeight: $resultsDiv.height()})
     })
 
-    // global.localStorage.setItem('code',this.state.code); // TODO: enable only in dev mode
+    // enable only in dev mode
+    // global.localStorage.setItem('code',this.state.code);
 
     this.setState({newborn: false, results: []});
 
@@ -335,11 +338,7 @@ var CodeEditor = React.createClass({
 
     var cleanup = function() {
       window.onerror = null;
-      comp.setState({execution: 'idle'}, function() {
-        // set resultList minHeight with callback because we need to make sure the idle style is applied first
-        // i.e., the css min-height attribute is set to 0 so we can actually measure the height of the div
-        //comp.refs['resultList'].setState({minHeight: $resultsDiv.height()})
-      });
+      comp.setState({execution: 'idle'});
 
       // remove completed job
       jobsQueue.shift();
@@ -352,6 +351,7 @@ var CodeEditor = React.createClass({
     var job = function() {
 
       // run vanilla js
+      // TODO: detect language from codemirror value, not React prop
       if (language == 'javascript') {
         // TODO: grey out the run button but don't show a cancel button
         try {
