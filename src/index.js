@@ -192,7 +192,13 @@ var CodeEditor = React.createClass({
     // of it shrinking because it's empty and growing again as
     // results populate
     resultList.setState(function(state,props) {
-      return _.extend({}, state, {minHeight: $resultsDiv.height()})
+      //return _.extend({}, state, {minHeight: $resultsDiv.height()})
+
+      return _.extend({}, state, {minHeight:
+                                  util.sum($resultsDiv.contents().map(function(i,x) {
+                                    return $(x).height()
+                                  }))
+                                 })
     })
 
     // enable only in dev mode
