@@ -29,5 +29,5 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "long ouyang",
-  "license": "ISC"
+  "license": "MIT"
 }
