@@ -439,7 +439,11 @@ var globalExport = {
   },
   get: function(k) {
     if (k) {
-      return topStore[k]
+      if (_.has(topStore, k)) {
+        return topStore[k]
+      } else {
+        throw new Error('There is no stored item with key ' + k)
+      }
     } else {
       // when called with no argument, returns backing dictionary
       return topStore;
