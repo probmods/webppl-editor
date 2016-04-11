@@ -324,7 +324,8 @@ var CodeEditor = React.createClass({
     });
   },
   render: function() {
-    var myRangeFinder = Folding.myRangeFinder;
+
+    var comp = this;
 
     var options = {
       mode: 'javascript',
@@ -334,9 +335,12 @@ var CodeEditor = React.createClass({
       extraKeys: {
         "Tab": "indentAuto",
         "Cmd-/": "toggleComment",
-        "Cmd-.": function(cm){cm.foldCode(cm.getCursor(), myRangeFinder); }
+        "Cmd-.": function(cm){
+          cm.foldCode(cm.getCursor(),
+                      Folding.myRangeFinder); }
       }
     };
+
 
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
@@ -369,8 +373,12 @@ var setupCode = function(preEl, options) {
 
   ReactDOM.render(r, editorDiv, function() {
     ret = this;
-    var cm = this.refs.editor.codeMirror;
+    var comp = this;
+
     requestAnimationFrame(function() {
+
+      var cm = comp.refs['editor'].getCodeMirror();
+
       parentDiv.replaceChild(editorDiv, preEl);
       cm.refresh();
 
