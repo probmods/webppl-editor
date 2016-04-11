@@ -42,7 +42,7 @@ var ResultError = React.createClass({
   render: function() {
     var stack = this.state.showStack ? "\n" + this.props.stack : "";
     return (
-        <pre key={this.props.key} className='error' onClick={this.handleClick}><span className='error-message'>{this.props.message}</span>{stack}</pre>
+        <pre key={this.props._key} className='error' onClick={this.handleClick}><span className='error-message'>{this.props.message}</span>{stack}</pre>
     );
   }
 });
@@ -58,7 +58,7 @@ var ResultText = React.createClass({
   shouldComponentUpdate: pureSCU,
   render: function() {
     return (
-        <pre key={this.props.key} className='text'>{this.props.message + ""}</pre>
+        <pre key={this.props._key} className='text'>{this.props.message + ""}</pre>
     );
   }
 });
@@ -103,11 +103,9 @@ var ResultList = React.createClass({
   render: function() {
     var renderResult = function(d,k) {
       if (d.type == 'text') {
-        return <ResultText key={k} {...d} />
+        return <ResultText key={k} _key={k} {...d} />
       } else if (d.type == 'error') {
-        return <ResultError key={k} {...d} />
-      } else if (d.type == 'barChart') {
-        return <ResultBarChart key={k} {...d} />
+        return <ResultError key={k} _key={k} {...d} />
       } else if (d.type == 'DOM') {
         return <ResultDOM key={k} {...d} />
       } else {
