@@ -10,18 +10,7 @@ var CodeMirror = require('codemirror');
 var CodeMirrorComponent = require('react-codemirror');
 var Folding = require('./folding')(CodeMirror);
 
-// TODO: eliminate once webppl-viz stabilizes
-var d3 = require('d3');
-if (typeof window !== "undefined") {
-  window.d3 = d3;
-}
-if (typeof global !== "undefined") {
-  global.d3 = d3;
-}
-
-var vg = require('vega');
-
-require('codemirror/addon/edit/matchbrackets')
+require('codemirror/addon/edit/matchbrackets') // TODO: why doesn't this work out of the box?
 require('codemirror/mode/javascript/javascript');
 require('codemirror/addon/comment/comment'); // installs toggleComment
 
