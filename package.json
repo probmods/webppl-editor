@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "description": "browser editor for webppl",
   "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/probmods/webppl-editor"
+  },
   "browserify-shim": {},
   "dependencies": {
     "babel-preset-react": "^6.1.18",
