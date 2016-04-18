@@ -1,5 +1,5 @@
 {
-  "name": "wp-editor",
+  "name": "webppl-editor",
   "version": "0.0.1",
   "description": "browser editor for webppl",
   "main": "src/index.js",
