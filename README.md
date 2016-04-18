@@ -1,6 +1,4 @@
-**Note: work in progress**
-
-A browser-based code editor for WebPPL (requires version 0.6.1 or higher)
+A browser-based code editor for WebPPL (requires version 0.6.2 or higher)
 
 Demo: https://web.stanford.edu/~louyang/wp-editor/compiled/index.html
 
@@ -35,11 +33,11 @@ The library installs a single object, `wpEditor`, into the global namespace. `wp
 Compiling:
 
 ```sh
-make all
+grunt browserify
 ```
 
 Watchified compiling (incrementally rebuilds after source files have updated, only works for js, not css):
 
 ```sh
-make watch
+grunt browserify-watch
 ```
