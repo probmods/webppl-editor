@@ -767,7 +767,7 @@ TensorNode.prototype.copy = function(other) {
 	this.x = other.x.clone();
 	this.dx = other.dx.clone();
 };
-Tensor.prototype.clone = function() {
+TensorNode.prototype.clone = function() {
 	var node = Object.create(Tensor.prototype);
 	node.copy(this);
 	return node;
@@ -778,7 +778,7 @@ TensorNode.prototype.refCopy = function(other) {
 	this.dx = other.dx.refClone();
 };
 TensorNode.prototype.refClone = function() {
-	var node = Object.create(Tensor.prototype);
+	var node = Object.create(TensorNode.prototype);
 	node.refCopy(this);
 	return node;
 };
@@ -999,14 +999,14 @@ Tensor.prototype.refCopy = function(other) {
 	this.dims = other.dims;
 	this.length = other.length;
 	this.data = other.data;
+	return this;
 }
 
 // Create a new Tensor object that refers to the same backing store
 //    as this Tensor object
 Tensor.prototype.refClone = function() {
 	var t = Object.create(Tensor.prototype);
-	t.reference(this);
-	return t;
+	return t.refCopy(this);
 };
 
 
@@ -29216,7 +29216,7 @@ arguments[4][90][0].apply(exports,arguments)
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
-  global.Immutable = factory();
+  (global.Immutable = factory());
 }(this, function () { 'use strict';var SLICE$0 = Array.prototype.slice;
 
   function createClass(ctor, superClass) {
@@ -30111,7 +30111,7 @@ arguments[4][90][0].apply(exports,arguments)
       }
       return 'Range [ ' +
         this._start + '...' + this._end +
-        (this._step > 1 ? ' by ' + this._step : '') +
+        (this._step !== 1 ? ' by ' + this._step : '') +
       ' ]';
     };
 
@@ -30427,6 +30427,17 @@ arguments[4][90][0].apply(exports,arguments)
           iter.forEach(function(v, k)  {return map.set(k, v)});
         });
     }
+
+    Map.of = function() {var keyValues = SLICE$0.call(arguments, 0);
+      return emptyMap().withMutations(function(map ) {
+        for (var i = 0; i < keyValues.length; i += 2) {
+          if (i + 1 >= keyValues.length) {
+            throw new Error('Missing value for key: ' + keyValues[i]);
+          }
+          map.set(keyValues[i], keyValues[i + 1]);
+        }
+      });
+    };
 
     Map.prototype.toString = function() {
       return this.__toString('Map {', '}');
@@ -32340,7 +32351,11 @@ arguments[4][90][0].apply(exports,arguments)
       begin = begin | 0;
     }
     if (end !== undefined) {
-      end = end | 0;
+      if (end === Infinity) {
+        end = originalSize;
+      } else {
+        end = end | 0;
+      }
     }
 
     if (wholeSlice(begin, end, originalSize)) {
@@ -32876,6 +32891,12 @@ arguments[4][90][0].apply(exports,arguments)
     Record.prototype.set = function(k, v) {
       if (!this.has(k)) {
         throw new Error('Cannot set unknown key "' + k + '" on ' + recordName(this));
+      }
+      if (this._map && !this._map.has(k)) {
+        var defaultVal = this._defaultValues[k];
+        if (v === defaultVal) {
+          return this;
+        }
       }
       var newMap = this._map && this._map.set(k, v);
       if (this.__ownerID || newMap === this._map) {
@@ -33560,8 +33581,8 @@ arguments[4][90][0].apply(exports,arguments)
       return entry ? entry[1] : notSetValue;
     },
 
-    findEntry: function(predicate, context) {
-      var found;
+    findEntry: function(predicate, context, notSetValue) {
+      var found = notSetValue;
       this.__iterate(function(v, k, c)  {
         if (predicate.call(context, v, k, c)) {
           found = [k, v];
@@ -33571,8 +33592,8 @@ arguments[4][90][0].apply(exports,arguments)
       return found;
     },
 
-    findLastEntry: function(predicate, context) {
-      return this.toSeq().reverse().findEntry(predicate, context);
+    findLastEntry: function(predicate, context, notSetValue) {
+      return this.toSeq().reverse().findEntry(predicate, context, notSetValue);
     },
 
     forEach: function(sideEffect, context) {
@@ -33845,35 +33866,6 @@ arguments[4][90][0].apply(exports,arguments)
   IterablePrototype.chain = IterablePrototype.flatMap;
   IterablePrototype.contains = IterablePrototype.includes;
 
-  // Temporary warning about using length
-  (function () {
-    try {
-      Object.defineProperty(IterablePrototype, 'length', {
-        get: function () {
-          if (!Iterable.noLengthWarning) {
-            var stack;
-            try {
-              throw new Error();
-            } catch (error) {
-              stack = error.stack;
-            }
-            if (stack.indexOf('_wrapObject') === -1) {
-              console && console.warn && console.warn(
-                'iterable.length has been deprecated, '+
-                'use iterable.size or iterable.count(). '+
-                'This warning will become a silent error in a future version. ' +
-                stack
-              );
-              return this.size;
-            }
-          }
-        }
-      });
-    } catch (e) {}
-  })();
-
-
-
   mixin(KeyedIterable, {
 
     // ### More sequential methods
@@ -33954,9 +33946,6 @@ arguments[4][90][0].apply(exports,arguments)
     lastIndexOf: function(searchValue) {
       var key = this.toKeyedSeq().reverse().keyOf(searchValue);
       return key === undefined ? -1 : key;
-
-      // var index =
-      // return this.toSeq().reverse().indexOf(searchValue);
     },
 
     reverse: function() {
@@ -34080,6 +34069,7 @@ arguments[4][90][0].apply(exports,arguments)
   });
 
   SetIterable.prototype.has = IterablePrototype.includes;
+  SetIterable.prototype.contains = SetIterable.prototype.includes;
 
 
   // Mixin subclasses
@@ -56265,6 +56255,7 @@ var Histogram = function() {
 };
 
 Histogram.prototype.add = function(value) {
+  var value = ad.valueRec(value);
   var k = util.serialize(value);
   if (this.hist[k] === undefined) {
     this.hist[k] = { count: 0, val: value };
@@ -56302,6 +56293,8 @@ var MAP = function(retainSamples) {
 };
 
 MAP.prototype.add = function(value, score) {
+  var value = ad.valueRec(value);
+  var score = ad.value(score);
   if (this.retainSamples) {
     this.samples.push({ value: value, score: score });
   }
@@ -57202,7 +57195,7 @@ var naming = require('./transforms/naming').naming;
 var thunkify = require('./syntax').thunkify;
 var cps = require('./transforms/cps').cps;
 var analyze = require('./analysis/main').analyze;
-var version = 'v0.6.2-3601720';
+var version = 'v0.6.2-0557d8b';
 var packages = [];
 var load = _.once(function () {
     packages.forEach(function (pkg) {
@@ -60616,7 +60609,6 @@ var _ = require('underscore');
 var util = require('../util');
 var Histogram = require('../aggregation/histogram');
 var MAP = require('../aggregation/map');
-var ad = require('../ad');
 
 module.exports = function(env) {
 
@@ -60643,10 +60635,6 @@ module.exports = function(env) {
         new MAP(options.justSample) :
         new Histogram();
 
-    var addToAggregator = options.kernel.adRequired ?
-        function(value, score) { aggregator.add(ad.valueRec(value), ad.value(score)); } :
-        aggregator.add.bind(aggregator);
-
     var initialize, run, finish;
 
     initialize = function() {
@@ -60657,7 +60645,7 @@ module.exports = function(env) {
     run = function(initialTrace) {
       initialTrace.info = { accepted: 0, total: 0 };
       var callback = kernels.tap(function(trace) { _.invoke(callbacks, 'iteration', trace); });
-      var collectSample = makeExtractValue(addToAggregator);
+      var collectSample = makeExtractValue(aggregator.add.bind(aggregator));
       var kernel = kernels.sequence(options.kernel, callback);
       var chain = kernels.sequence(
           kernels.repeat(options.burn, kernel),
@@ -60739,7 +60727,7 @@ module.exports = function(env) {
 };
 
 }).call(this,require('_process'))
-},{"../ad":152,"../aggregation/histogram":154,"../aggregation/map":155,"../util":190,"./initialize":170,"./kernels":171,"_process":389,"underscore":151}],173:[function(require,module,exports){
+},{"../aggregation/histogram":154,"../aggregation/map":155,"../util":190,"./initialize":170,"./kernels":171,"_process":389,"underscore":151}],173:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
@@ -61272,8 +61260,8 @@ module.exports = function(env) {
     this.rejuvKernel = kernels.parseOptions(options.rejuvKernel);
     this.rejuvSteps = options.rejuvSteps;
 
+    this.adRequired = this.rejuvKernel.adRequired;
     this.performRejuv = this.rejuvSteps > 0;
-    this.adRequired = this.performRejuv && this.rejuvKernel.adRequired;
     this.performFinalRejuv = this.performRejuv && options.finalRejuv;
     this.numParticles = options.particles;
     this.debug = options.debug;
@@ -61506,9 +61494,6 @@ module.exports = function(env) {
     assert.strictEqual(this.completeParticles.length, this.numParticles);
 
     var hist = new Histogram();
-    var addToHist = this.adRequired ?
-        function(value) { hist.add(ad.valueRec(value)); } :
-        hist.add.bind(hist);
     var logAvgW = _.first(this.completeParticles).logWeight;
 
     return util.cpsForEach(
@@ -61519,10 +61504,10 @@ module.exports = function(env) {
                 this.rejuvSteps,
                 kernels.sequence(
                     this.rejuvKernel,
-                    kernels.tap(function(trace) { addToHist(trace.value); })));
+                    kernels.tap(function(trace) { hist.add(trace.value); })));
             return chain(k, particle.trace);
           } else {
-            addToHist(particle.trace.value);
+            hist.add(particle.trace.value);
             return k();
           }
         }.bind(this),
