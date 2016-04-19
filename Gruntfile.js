@@ -15,17 +15,7 @@ var jslintSettings = {
   lib: {
     src: [
       'Gruntfile.js',
-      'src/header.wppl',
-      'src/**/!(erp|enumerate|distribution).js'
-    ]
-  },
-  test: {
-    src: ['tests/**/*.js']
-  },
-  wppl: {
-    src: [
-      'tests/test-data/**/*.wppl',
-      'examples/*.wppl'
+      'src/*.js',
     ]
   }
 };
@@ -37,9 +27,7 @@ module.exports = function(grunt) {
     jshint: {
       files: [
         'Gruntfile.js',
-        'src/header.wppl',
-        'src/**/*.js',
-        'tests/**/*.js'
+        'src/*.js'
       ],
       options: {
         maxerr: 500,
