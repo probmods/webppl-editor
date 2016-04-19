@@ -1,6 +1,6 @@
 A browser-based code editor for WebPPL (requires version 0.6.2 or higher)
 
-Demo: https://web.stanford.edu/~louyang/wp-editor/compiled/index.html
+Demo: https://probmods.github.io/webppl-editor
 
 Usage:
 
