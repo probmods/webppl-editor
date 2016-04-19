@@ -316,6 +316,8 @@ var CodeEditor = React.createClass({
   },
   render: function() {
 
+    var comp = this;
+
     var options = {
       mode: 'javascript',
       lineNumbers: false,
@@ -325,9 +327,11 @@ var CodeEditor = React.createClass({
       extraKeys: {
         'Tab': 'indentAuto',
         'Cmd-/': 'toggleComment',
-        'Cmd-.': function(cm){
-          cm.foldCode(cm.getCursor(),
-                      Folding.myRangeFinder); }
+        'Ctrl-/': 'toggleComment',
+        'Cmd-.': function(cm) { cm.foldCode(cm.getCursor(), Folding.myRangeFinder); },
+        'Ctrl-.': function(cm) { cm.foldCode(cm.getCursor(), Folding.myRangeFinder); },
+        'Ctrl-Enter': function(cm) { comp.runCode(); },
+        'Cmd-Enter': function(cm) { comp.runCode(); }
       }
     };
 
