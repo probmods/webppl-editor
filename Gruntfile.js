@@ -3,6 +3,7 @@
 var _ = require('underscore');
 var open = require('open');
 var child_process = require('child_process');
+var fs = require('fs');
 
 var jslintSettings = {
   options: {
@@ -88,10 +89,18 @@ module.exports = function(grunt) {
   grunt.registerTask('hint', ['jshint']);
   grunt.registerTask('fixstyle', ['fixjsstyle']);
 
-  grunt.registerTask('bundle', 'Create browser bundle (= browserify + uglify)', function() {
+  grunt.registerTask('bundle', 'Create browser bundle (= css + browserify + uglify)', function() {
     var taskArgs = (arguments.length > 0) ? ':' + _.toArray(arguments).join(':') : '';
-    grunt.task.run('browserify' + taskArgs, 'uglify');
+    grunt.task.run('browserify' + taskArgs, 'uglify','css');
   });
+
+  grunt.registerTask('css', 'Concatenate css files', function() {
+    var cssSource =
+        fs.readFileSync('src/component.css','utf8') +
+        fs.readFileSync('node_modules/codemirror/lib/codemirror.css','utf8');
+
+    fs.writeFileSync('bundle/webppl-editor.css', cssSource)
+  })
 
   grunt.registerTask('browserify', 'Generate "bundle/webppl-editor.js".', function() {
     child_process.execSync('mkdir -p bundle');
