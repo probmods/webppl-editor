@@ -21,6 +21,7 @@ var renderReturnValue = function(x) {
   }
 
   if (x && (x.score != undefined) && (x.sample != undefined))
+    // TODO: show as table?
     return '<erp>';
 
   if (typeof x == 'function')
@@ -348,14 +349,27 @@ var setupCode = function(preEl, options) {
   // converts <pre><code>...</code></pre>
   // to a CodeMirror instance
 
+  options = _.defaults(
+    options || {},
+    {
+      trim: true,
+      language: 'webppl'
+    }
+  );
+
   var parentDiv = preEl.parentNode;
 
   var editorDiv = document.createElement('div');
 
-  var r = React.createElement(CodeEditor,
-                              {code: $(preEl.children[0]).text(),
-        language: options.language
-                              });
+  var code = $(preEl).text();
+  if (options.trim) {
+    code = code.trim()
+  }
+
+  var r = React.createElement(
+    CodeEditor,
+    {code: code,
+     language: options.language});
 
   // TODO: figure out if this is an anti-pattern
   var ret = {};
