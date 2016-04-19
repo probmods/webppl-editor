@@ -1,0 +1,160 @@
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+     body {
+         font-family: Menlo
+     }
+
+     pre {
+         border: 1px solid black;
+         border-radius: 2px;
+         margin: 0;
+         padding: 4px;
+     }
+
+     pre > code {
+         color: #bfbfbf;
+     }
+
+
+     #wrapper {
+         width: 50%;
+         min-width: 600px;
+         margin: 0 auto;
+     }
+
+     canvas.paper {
+         border: 1px solid gray;
+     }
+
+    </style>
+    <link rel='stylesheet' type='text/css' href='editor.css'>
+    <script src="webppl-editor.js"></script>
+    <script src="jquery.js"></script>
+    <script src="paper.js"></script>
+    <script src="draw.js"></script>
+  </head>
+  <body>
+    <div id="wrapper">
+      <b>tricky reference error</b>:
+      <pre id="tricky-reference-error"><code>print('started');
+var x = sum(repeat(1e5, flip))
+tricky
+print('ended')</code></pre>
+
+      <b>MCMC callback:</b>
+      <pre><code>var model = function() { return gaussian(0,1) };
+MCMC(model, { samples: 1e6, callbacks: [wpEditor.MCMCProgress()]});</code></pre>
+
+      <b>Work across boxes 1 - store an inference result:</b>
+      <pre><code>var posterior = ParticleFilter(function() { return gaussian(0,1) },100);
+wpEditor.put('n(0,1):100', posterior)</code></pre>
+
+      <b>Work across boxes 2 - post-processing an inference result:</b>
+      <pre><code>var posterior = wpEditor.get('n(0,1):100');
+_.max(posterior.support())</code></pre>
+
+      <b>dippl.org computer vision example:</b>
+      <pre id="dippl-cv-beach"><code>///fold:
+var targetImage = Draw(50, 50, true);
+loadImage(targetImage, "beach.png")
+
+var uniformDraw = function(xs){
+  var i = randomInteger(xs.length);
+  return xs[i];
+}
+
+var drawLines = function(drawObj, lines){
+  var line = lines[0];
+  drawObj.line(line[0], line[1], line[2], line[3], line[4], line[5], line[6]);
+  if (lines.length !== 1) {
+    drawLines(drawObj, lines.slice(1));
+  }
+}
+
+var randomStrokeWidth = function(){
+  var widths = [2, 4, 8, 16];
+  return uniformDraw(widths);
+}
+
+var randomOpacity = function(){
+  var opacities = [0, 0.2, .5];
+  return uniformDraw(opacities);
+}
+
+var _getRandomColor = function(i) {
+  if (i == 0){
+    return "";
+  } else {
+    // var letters = '0123456789ABCDEF'.split('');
+    var color = '#';
+    return uniformDraw('04AF') + _getRandomColor(i-1);
+  }
+}
+
+var randomColor = function(){
+  return "#" + _getRandomColor(6);
+}
+
+var makeLines = function(n, lines){
+  var x1 = randomInteger(50);
+  var y1 = randomInteger(50);
+  var x2 = randomInteger(50);
+  var y2 = y1;
+  var strokeWidth = randomStrokeWidth();
+  var opacity = randomOpacity();
+  var color = randomColor();
+  var newLines = lines.concat([[x1, y1, x2, y2, strokeWidth, opacity, color]]);
+  return (n==1) ? newLines : makeLines(n-1, newLines);
+}
+///
+
+var counter = [];
+
+MH(
+  function(){
+    var lines = makeLines(8, []);
+
+
+    var showOutputImage = (counter.length % 100 == 0);
+    var finalGeneratedImage = Draw(50, 50, showOutputImage);
+
+    drawLines(finalGeneratedImage, lines);
+    var newScore = -targetImage.distance(finalGeneratedImage)/1000; // Increase to 10000 to see more diverse samples
+
+	if (!showOutputImage) {
+      finalGeneratedImage.destroy()
+    }
+
+    factor(newScore);
+
+    counter.push(1);
+
+    return lines
+   }, 2500);</code></pre>
+
+      <b>Vanilla JS:</b>
+      <pre><code>// language: javascript
+
+[1,2,3].map(function(x) { return x + 1 })</code></pre>
+    </div>
+
+  </body>
+  <script>
+   var getLanguage = function(code){
+       var firstLine = code.split("\n")[0];
+    if (firstLine == "// language: javascript") {
+      return "javascript";
+    } else {
+      return "webppl";
+    }
+  };
+
+   $("pre").map(function(i,el) {
+       wpEditor.setup(el, {language: getLanguage($(el).text())})
+   })
+  </script>
+
+  <script src="webppl.js" defer></script>
+</html>
