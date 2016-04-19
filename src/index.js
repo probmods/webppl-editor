@@ -10,7 +10,8 @@ var CodeMirror = require('codemirror');
 var CodeMirrorComponent = require('react-codemirror');
 var Folding = require('./folding')(CodeMirror);
 
-require('codemirror/addon/edit/matchbrackets') // TODO: why doesn't this work out of the box?
+require('codemirror/addon/edit/matchbrackets');
+require('codemirror/addon/edit/closebrackets');
 require('codemirror/mode/javascript/javascript');
 require('codemirror/addon/comment/comment'); // installs toggleComment
 
@@ -317,6 +318,7 @@ var CodeEditor = React.createClass({
     var options = {
       mode: 'javascript',
       lineNumbers: false,
+      autoCloseBrackets: true,
       matchBrackets: true,
       viewportMargin: Infinity,
       extraKeys: {
