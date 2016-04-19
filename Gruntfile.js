@@ -21,6 +21,12 @@ var jslintSettings = {
 };
 module.exports = function(grunt) {
   grunt.initConfig({
+    subgrunt: {
+      // TODO: after browserifying webppl, move to demo folder
+      webppl: {
+        'node_modules/webppl': 'browserify'
+      }
+    },
     nodeunit: {
       all: ['tests/test-*.js']
     },
@@ -69,6 +75,7 @@ module.exports = function(grunt) {
     return ' -t [babelify --presets [react] ] src/index.js -o bundle/webppl-editor.js';
   }
 
+  grunt.loadNpmTasks('grunt-subgrunt');
   grunt.loadNpmTasks('grunt-gjslint');
   grunt.loadNpmTasks('grunt-contrib-jshint');
   grunt.loadNpmTasks('grunt-contrib-nodeunit');
