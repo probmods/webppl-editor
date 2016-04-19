@@ -194,8 +194,8 @@ var CodeEditor = React.createClass({
     this.setState({newborn: false, results: []});
 
     var comp = this;
-    var code = this.state.code;
-    var language = this.props.language; // TODO: detect this from CodeMirror text
+    var code = comp.state.code;
+    var language = comp.props.language; // TODO: detect this from CodeMirror text
 
     var endJob = function(store, returnValue) {
       var renderedReturnValue = renderReturnValue(returnValue);
@@ -313,8 +313,6 @@ var CodeEditor = React.createClass({
     });
   },
   render: function() {
-
-    var comp = this;
 
     var options = {
       mode: 'javascript',
