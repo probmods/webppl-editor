@@ -2,5 +2,5 @@
 --jslint_error=all
 --strict
 --max_line_length=1000
---disable=10,11
+--disable=2,10,11,120
 --additional_extensions=wppl
