@@ -16,7 +16,7 @@ require('codemirror/addon/comment/comment'); // installs toggleComment
 
 var renderReturnValue = function(x) {
   if (x === undefined) {
-    return ""
+    return ''
   }
 
   if (x && (x.score != undefined) && (x.sample != undefined))
@@ -40,7 +40,7 @@ var ResultError = React.createClass({
     this.setState({showStack: !this.state.showStack})
   },
   render: function() {
-    var stack = this.state.showStack ? "\n" + this.props.stack : "";
+    var stack = this.state.showStack ? '\n' + this.props.stack : '';
     return (
         <pre key={this.props._key} className='error' onClick={this.handleClick}><span className='error-message'>{this.props.message}</span>{stack}</pre>
     );
@@ -58,7 +58,7 @@ var ResultText = React.createClass({
   shouldComponentUpdate: pureSCU,
   render: function() {
     return (
-        <pre key={this.props._key} className='text'>{this.props.message + ""}</pre>
+        <pre key={this.props._key} className='text'>{this.props.message + ''}</pre>
     );
   }
 });
@@ -72,21 +72,21 @@ var ResultDOM = React.createClass({
     this.div = ReactDOM.findDOMNode(this);
   },
   render: function() {
-    return (<div className="custom"></div>)
+    return (<div className='custom'></div>)
   }
 })
 
 var RunButton = React.createClass({
   getLabel: function() {
     var labels = {
-      idle: "run",
+      idle: 'run',
       queued: 'queued...'
     };
     return _.has(labels, this.props.status) ? labels[this.props.status] : this.props.status;
   },
   render: function() {
     return (
-        <button className='run' type="button" onClick={this.props.clickHandler} disabled={!(this.props.status == 'idle')}>{this.getLabel()}</button>
+        <button className='run' type='button' onClick={this.props.clickHandler} disabled={!(this.props.status == 'idle')}>{this.getLabel()}</button>
     )
   }
 });
@@ -122,7 +122,7 @@ var ResultList = React.createClass({
       minHeight: this.state.minHeight
     }
 
-    return (<div style={style} className={this.props.newborn ? "result hide" : "result"}>
+    return (<div style={style} className={this.props.newborn ? 'result hide' : 'result'}>
             {list}
             </div>);
 
@@ -136,7 +136,7 @@ var CodeEditor = React.createClass({
       code: this.props.code,
       results: [],
       newborn: true,
-      execution: "idle"
+      execution: 'idle'
     }
   },
   // side effects
@@ -150,7 +150,7 @@ var CodeEditor = React.createClass({
       return k(s, x.__print__(x));
     } else {
       this.addResult({type: 'text',
-                      message: typeof x == 'object' ? JSON.stringify(x) : x})
+        message: typeof x == 'object' ? JSON.stringify(x) : x})
       return k(s)
     }
   },
@@ -160,7 +160,7 @@ var CodeEditor = React.createClass({
 
     // return the most recent custom component
     // TODO: don't depend on jquery for this
-    var element = _.last( $(ReactDOM.findDOMNode(this)).find(".custom") );
+    var element = _.last($(ReactDOM.findDOMNode(this)).find('.custom'));
     return element;
   },
   // ------------------------------------------------------------
@@ -182,10 +182,10 @@ var CodeEditor = React.createClass({
       //return _.extend({}, state, {minHeight: $resultsDiv.height()})
 
       return _.extend({}, state, {minHeight:
-                                  util.sum($resultsDiv.contents().map(function(i,x) {
-                                    return $(x).height()
-                                  }))
-                                 })
+            util.sum($resultsDiv.contents().map(function(i,x) {
+              return $(x).height()
+            }))
+      })
     })
 
     // enable only in dev mode
@@ -241,7 +241,7 @@ var CodeEditor = React.createClass({
       }
 
       // inject this component's side effect methods into global
-      var sideEffectMethods = ["print"];
+      var sideEffectMethods = ['print'];
       _.each(sideEffectMethods,
              function(name) { global[name] = comp[name]; });
       // note: React automatically binds methods to their class so we don't need to use .bind here
@@ -320,9 +320,9 @@ var CodeEditor = React.createClass({
       matchBrackets: true,
       viewportMargin: Infinity,
       extraKeys: {
-        "Tab": "indentAuto",
-        "Cmd-/": "toggleComment",
-        "Cmd-.": function(cm){
+        'Tab': 'indentAuto',
+        'Cmd-/': 'toggleComment',
+        'Cmd-.': function(cm){
           cm.foldCode(cm.getCursor(),
                       Folding.myRangeFinder); }
       }
@@ -332,12 +332,12 @@ var CodeEditor = React.createClass({
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
-      <div ref="cont" className="wpedit">
-        <CodeMirrorComponent ref="editor" value={this.state.code} onChange={this.updateCode} options={options} codeMirrorInstance={CodeMirror} />
+        <div ref='cont' className='wpedit'>
+        <CodeMirrorComponent ref='editor' value={this.state.code} onChange={this.updateCode} options={options} codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
-        <ResultList newborn={this.state.newborn} ref="resultList" executionState={this.state.execution} list={this.state.results} />
-      </div>
+        <ResultList newborn={this.state.newborn} ref='resultList' executionState={this.state.execution} list={this.state.results} />
+        </div>
     );
   }
 });
@@ -352,7 +352,7 @@ var setupCode = function(preEl, options) {
 
   var r = React.createElement(CodeEditor,
                               {code: $(preEl.children[0]).text(),
-                               language: options.language
+        language: options.language
                               });
 
   // TODO: figure out if this is an anti-pattern
@@ -373,7 +373,7 @@ var setupCode = function(preEl, options) {
       var lastLine = cm.lastLine();
       for(var i=0;i<=lastLine;i++) {
         var txt = cm.getLine(i),
-            pos = txt.indexOf("///fold:");
+            pos = txt.indexOf('///fold:');
         if (pos==0) {cm.foldCode(CodeMirror.Pos(i,pos), Folding.tripleCommentRangeFinder);}
       }
     })
@@ -428,8 +428,8 @@ var globalExport = {
     topStore[key] = item;
     var div = globalExport.makeResultContainer();
     $(div).html('Stored item with key <span style="border: 1px solid gray; background-color: #dddddd; border-radius: 5px; padding: 0em 0.5em">' + key + '</b>').css({
-      "font-size": "12px",
-      "padding": "2px"
+      'font-size': '12px',
+      'padding': '2px'
     });
   },
   get: function(k) {
