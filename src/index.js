@@ -225,10 +225,12 @@ var CodeEditor = React.createClass({
         // TODO: grey out the run button but don't show a cancel button
         try {
           var res = eval(code);
-          endJob({}, eval(code));
+          endJob({}, res);
         } catch(e) {
           comp.addResult({type: 'error', message: e.message, stack: e.stack});
           cleanup();
+        } finally {
+          return;
         }
       }
 
