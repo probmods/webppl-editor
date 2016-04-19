@@ -1,1 +1,1 @@
-../../webppl/bundle/webppl.js
+../bundle/webppl.js
