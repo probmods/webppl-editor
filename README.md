@@ -31,32 +31,14 @@ The library installs a single object, `wpEditor`, into the global namespace. `wp
 - `get([key])`: retrieves the object with key `key`. When called with no key, returns the entire store.
 - `MCMCProgress()`: displays a progress bar during MCMC inference (work in progress).
 
-Compile javascript + minify, css:
+
+Development:
 
 ```sh
-grunt bundle
-```
-
-Compiling javascript:
-
-```sh
-grunt browserify
-```
-
-Minify javascript:
-
-```sh
-grunt uglify
-```
-
-Watchified compiling javascript:
-
-```sh
-grunt browserify-watch
-```
-
-Compiling css:
-
-```sh
-grunt browserify-watch
+grunt browserify        # makes webppl-editor.js
+grunt css               # makes webppl-editor.css
+grunt uglify            # makes webppl-editor.min.js
+grunt bundle            # = uglify + css
+grunt webppl            # makes bundle/webppl.js (for testing)
+grunt browserify-watch  # reruns browserify when it detects file changes
 ```

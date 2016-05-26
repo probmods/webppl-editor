@@ -23,7 +23,6 @@ var jslintSettings = {
 module.exports = function(grunt) {
   grunt.initConfig({
     subgrunt: {
-      // TODO: after browserifying webppl, move to demo folder
       webppl: {
         'node_modules/webppl': 'browserify'
       }
@@ -68,11 +67,6 @@ module.exports = function(grunt) {
   });
 
   function browserifyArgs(args) {
-    // var pkgArg = '';
-    // var requires = _.chain(_.toArray(args))
-    //     .map(function(name) { return ['--require', name]; })
-    //     .flatten().value();
-    // pkgArg = ' -t [' + ['./src/bundle.js'].concat(requires).join(' ') + ']';
     return ' -t [babelify --presets [react] ] src/index.js -o bundle/webppl-editor.js';
   }
 
@@ -89,6 +83,8 @@ module.exports = function(grunt) {
   grunt.registerTask('hint', ['jshint']);
   grunt.registerTask('fixstyle', ['fixjsstyle']);
 
+
+
   grunt.registerTask('bundle', 'Create browser bundle (= css + browserify + uglify)', function() {
     var taskArgs = (arguments.length > 0) ? ':' + _.toArray(arguments).join(':') : '';
     grunt.task.run('browserify' + taskArgs, 'uglify','css');
@@ -101,6 +97,16 @@ module.exports = function(grunt) {
 
     fs.writeFileSync('bundle/webppl-editor.css', cssSource)
   })
+
+  grunt.registerTask('copy-webppl','Copy webppl bundle into bundle/', function() {
+    child_process.execSync('cp node_modules/webppl/bundle/webppl.js bundle/');
+  })
+
+  grunt.registerTask('webppl', 'Make webppl bundle', function() {
+    grunt.task.run('subgrunt:webppl')
+    grunt.task.run('copy-webppl')
+  });
+
 
   grunt.registerTask('browserify', 'Generate "bundle/webppl-editor.js".', function() {
     child_process.execSync('mkdir -p bundle');
