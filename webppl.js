@@ -34,12 +34,14 @@ function makeBinaryDerivatives(code1, code2) {
 	} else  {
 		return {
 			scalar: [
+				// First arg is definitely a Node, second may or may not be
 				new Function('_x', '_y', [
 					'var x = _x.x;',
 					'var y = (typeof _y === "number") ? _y : _y.x;',
 					'var out = this.x;',
 					'_x.dx += (' + code1 + ') * this.dx;'
 				].join('\n')),
+				// Second arg is definitely a Node, first may or may not be
 				new Function('_x', '_y', [
 					'var x = (typeof _x === "number") ? _x : _x.x;',
 					'var y = _y.x;',
@@ -47,27 +49,53 @@ function makeBinaryDerivatives(code1, code2) {
 					'_y.dx += (' + code2 + ') * this.dx;'
 				].join('\n'))
 			],
+			// To match the implementations of the methods on Tensor objects,
+			//    the second argument might be a scalar or a Tensor.
 			tensor: [
+				// First arg is definitely a Node, second may or may not be
 				new Function('_x', '_y', [
 					'var _xx = _x.x;',
 					'var _yx = _y.x || _y;',
 					'var n = _xx.length;',
-					'while (n--) {',
-					'	var x = _xx.data[n];',
-					'	var y = _yx.data[n];',
-					'	var out = this.x.data[n];',
-					'   _x.dx.data[n] += (' + code1 + ') * this.dx.data[n];',
-					'}'
+					// y is a scalar
+					'if (typeof _yx === "number") {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx;',
+					'		var out = this.x.data[n];',
+					'	   _x.dx.data[n] += (' + code1 + ') * this.dx.data[n];',
+					'	}',
+					// y is a tensor 
+					'} else {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx.data[n];',
+					'		var out = this.x.data[n];',
+					'	   _x.dx.data[n] += (' + code1 + ') * this.dx.data[n];',
+					'	}',
+					'}',
 				].join('\n')),
+				// Second arg is definitely a Node, first may or may not be
 				new Function('_x', '_y', [
 					'var _xx = _x.x || _x;',
 					'var _yx = _y.x;',
-					'var n = _yx.length;',
-					'while (n--) {',
-					'	var x = _xx.data[n];',
-					'	var y = _yx.data[n];',
-					'	var out = this.x.data[n];',
-					'   _y.dx.data[n] += (' + code2 + ') * this.dx.data[n];',
+					'var n = _xx.length;',
+					// y is a scalar
+					'if (typeof _yx === "number") {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx;',
+					'		var out = this.x.data[n];',
+					'	   _y.dx += (' + code2 + ') * this.dx.data[n];',
+					'	}',
+					// y is a tensor
+					'} else {',
+					'	while (n--) {',
+					'		var x = _xx.data[n];',
+					'		var y = _yx.data[n];',
+					'		var out = this.x.data[n];',
+					'	   _y.dx.data[n] += (' + code2 + ') * this.dx.data[n];',
+					'	}',
 					'}'
 				].join('\n'))
 			]
@@ -78,6 +106,7 @@ function makeBinaryDerivatives(code1, code2) {
 
 var d = {};
 
+d.neg = makeUnaryDerivatives('-1');
 d.add = makeBinaryDerivatives('1', '1');
 d.sub = makeBinaryDerivatives('1', '-1');
 d.mul = makeBinaryDerivatives('y', 'x');
@@ -323,8 +352,23 @@ function makeFunctions(OutputType) {
 
 	var namePrefix = OutputType === Scalar ? 'scalar.' : 'tensor.';
 
-	// Lifted operators
-	var ops = {
+	// Lifted unary operators
+	var unops = {
+		neg: OutputType === Tensor ?
+			function(x) { return x.neg(); } :
+			function(x) { return -x; }
+	};
+	for (var op in unops) {
+		fns[op] = func.newUnaryFunction({
+			OutputType: OutputType,
+			name: namePrefix+op,
+			forward: unops[op],
+			backward: backward(derivs[op])
+		});
+	}
+
+	// Lifted binary operators
+	var binops = {
 		add: OutputType === Tensor ?
 			function(x, y) { return x.add(y); } :
 			function(x, y) { return x + y; },
@@ -338,11 +382,11 @@ function makeFunctions(OutputType) {
 			function(x, y) { return x.div(y); } :
 			function(x, y) { return x / y; }
 	};
-	for (var op in ops) {
+	for (var op in binops) {
 		fns[op] = func.newBinaryFunction({
 			OutputType: OutputType,
 			name: namePrefix+op,
-			forward: ops[op],
+			forward: binops[op],
 			backward1: backward(derivs[op])[0],
 			backward2: backward(derivs[op])[1]
 		});
@@ -382,6 +426,14 @@ function makeFunctions(OutputType) {
 			backward2: backward(derivs[fnname])[1]
 		});
 	}
+
+	// NaN and infinity checks
+	fns.isNaN = OutputType === Scalar ?
+		func.liftUnaryFunction(isNaN) :
+		func.liftUnaryFunction(function(t) { return t.isNaN(); });
+	fns.isFinite = OutputType === Scalar ?
+		func.liftUnaryFunction(isFinite) :
+		func.liftUnaryFunction(function(t) { return t.isFinite(); });
 
 	return fns;
 }
@@ -435,6 +487,147 @@ fns.scalar.leq = func.liftBinaryFunction(
 );
 
 
+// Matrix operations  -----------------------------------------------------
+
+
+fns.tensor.transpose = func.newUnaryFunction({
+  OutputType: Tensor,
+  name: 'transpose',
+  forward: function(a) {
+    return a.transpose();
+  },
+  backward: function(a) {
+    var h = this.x.dims[0];
+    var w = this.x.dims[1];
+    for (var i = 0; i < h; i++) {
+      for (var j = 0; j < w; j++) {
+        a.dx.data[j * h + i] += this.dx.data[i * w + j];
+      }
+    }
+  }
+});
+
+fns.tensor.diagonal = func.newUnaryFunction({
+  OutputType: Tensor,
+  name: 'diagonal',
+  forward: function(a) {
+    return a.diagonal();
+  },
+  backward: function(a) {
+    var n = a.dx.dims[0];
+    for (var i = 0; i < n; i++) {
+      a.dx.data[i] += this.dx.data[i * (n + 1)];
+    }
+  }
+});
+
+fns.tensor.inverse = func.newUnaryFunction({
+  OutputType: Tensor,
+  name: 'inverse',
+  forward: function(A) {
+    return A.inverse();
+  },
+  backward: function(A) {
+    var xT = this.x.T();
+    A.dx = A.dx.add(xT.dot(this.dx).dot(xT).neg());
+  }
+});
+
+fns.tensor.determinant = func.newUnaryFunction({
+  OutputType: Number,
+  name: 'determinant',
+  forward: function(A) {
+    return A.determinant();
+  },
+  backward: function(A) {
+    // A is square matrix.
+    // Assume A is invertable.
+    var n = A.x.dims[0];
+    var invA = A.x.inv();
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        A.dx.data[i * n + j] += this.x * this.dx * invA.data[j * n + i];
+      }
+    }
+  }
+});
+
+fns.tensor.dot = func.newBinaryFunction({
+  OutputType: Tensor,
+  name: 'dot',
+  forward: function(a, b) {
+    return a.dot(b);
+  },
+  backward1: function(A, B) {
+    var Ap = ad.value(A);
+    var Bp = ad.value(B);
+
+    var Ah = Ap.dims[0];
+    var Aw = Ap.dims[1];
+    var Bw = Bp.dims[1];
+    var wout = Bw;
+
+    for (var l = 0; l < Ah; l++) {
+      for (var m = 0; m < Aw; m++) {
+        var z = 0;
+        for (var j = 0; j < wout; j++) {
+          z += this.dx.data[l * wout + j] * Bp.data[m * Bw + j];
+        }
+        A.dx.data[l * Aw + m] += z;
+      }
+    }
+  },
+  backward2: function(A, B) {
+    var Ap = ad.value(A);
+    var Bp = ad.value(B);
+
+    var Ah = Ap.dims[0];
+    var Aw = Ap.dims[1];
+    var Bh = Bp.dims[0];
+    var Bw = Bp.dims[1];
+    var wout = Bw;
+
+    for (var l = 0; l < Bh; l++) {
+      for (var m = 0; m < Bw; m++) {
+        var z = 0;
+        for (var i = 0; i < Ah; i++) {
+          z += this.dx.data[i * wout + m] * Ap.data[i * Aw + l];
+        }
+        B.dx.data[l * Bw + m] += z;
+      }
+    }
+
+  }
+});
+
+
+// Tensor reductions  -----------------------------------------------------
+
+
+fns.tensor.sumreduce = func.newUnaryFunction({
+	OutputType: Scalar,
+	name: 'sumreduce',
+	forward: function(t) {
+		return t.sumreduce();
+	},
+	backward: function(t) {
+		var n = t.dx.data.length;
+		while (n--) {
+			t.dx.data[n] += this.dx;
+		}
+	}
+});
+
+fns.tensor.allreduce = func.liftUnaryFunction(function(t) {
+	return t.allreduce();
+});
+
+fns.tensor.anyreduce = func.liftUnaryFunction(function(t) {
+	return t.anyreduce();
+});
+
+// TODO: min/max?
+
 
 // Scalar/tensor shaping operations ---------------------------------------
 
@@ -487,7 +680,7 @@ fns.tensor.range = func.newFunction({
 			var n = end - start;
 			while (n--) {
 				var i = start + n;
-				this.dx.data[i] += t.dx.data[n];
+				t.dx.data[i] += this.dx.data[n];
 			}
 		}
 	},
@@ -637,21 +830,6 @@ fns.scalar.sum = func.newFunction({
 	getParents: func.naryGetParents
 });
 
-// Sum reduce a tensor
-fns.sumreduce = func.newUnaryFunction({
-	OutputType: Scalar,
-	name: 'sumreduce',
-	forward: function(t) {
-		return t.sumreduce();
-	},
-	backward: function(t) {
-		var n = t.dx.data.length;
-		while (n--) {
-			t.dx.data[n] += this.dx;
-		}
-	}
-});
-
 // http://stats.stackexchange.com/questions/79454/softmax-layer-in-a-neural-network
 fns.tensor.softmax = func.newUnaryFunction({
 	OutputType: Tensor,
@@ -722,10 +900,17 @@ Node.prototype.backpropRec = function() {
 		while (n--) this.parents[n].backpropRec();
 	}
 };
+Node.prototype.zeroDerivativesRec = function() {
+	this.outDegree--;
+	if (this.outDegree === 0) {
+		this.zeroDerivativesImpl();
+		var n = this.parents.length;
+		while (n--) this.parents[n].zeroDerivativesRec();
+	}
+};
 Node.prototype.zeroDerivatives = function() {
-	this.zeroDerivativesImpl();
-	var n = this.parents.length;
-	while (n--) this.parents[n].zeroDerivatives();
+	this.computeOutDegree();
+	this.zeroDerivativesRec();
 };
 // By default, backward does nothing
 Node.prototype.backward = function() {};
@@ -804,6 +989,7 @@ module.exports = {
 },{"../tensor.js":7}],5:[function(require,module,exports){
 'use strict';
 
+var utils = require('../utils.js');
 var graph = require('./graph.js');
 var Tensor = require('../tensor.js');
 
@@ -834,22 +1020,16 @@ ad.params = function(dims, name) {
 
 var func = require('./func.js');
 var functions = require('./functions.js');
-var modules = [
-	func, functions
-];
+ad = utils.mergeObjects(ad, func, functions);
+
+
 // The macro-transform code only works via node
 if (typeof window === "undefined") {
-	modules.push(require('./transform.js'));
-}
-for (var i = 0; i < modules.length; i++) {
-	var m = modules[i];
-	for (var prop in m) {
-		ad[prop] = m[prop];
-	}
+	ad = utils.mergeObjects(ad, require('./transform.js'));
 }
 
 module.exports = ad;
-},{"../tensor.js":7,"./func.js":2,"./functions.js":3,"./graph.js":4,"./transform.js":6}],6:[function(require,module,exports){
+},{"../tensor.js":7,"../utils.js":8,"./func.js":2,"./functions.js":3,"./graph.js":4,"./transform.js":6}],6:[function(require,module,exports){
 (function (__dirname){
 'use strict';
 
@@ -961,6 +1141,7 @@ Tensor.prototype.reshape = function(dims) {
 	while (n--) size *= dims[n];
 	assert(size === this.length, 'Tensor reshape invalid size');
 	this.dims = dims;
+  return this;
 }
 
 Tensor.prototype.fill = function(val) {
@@ -1059,7 +1240,7 @@ Tensor.prototype.fromArray = function(arr) {
 };
 
 Tensor.prototype.toString = function() {
-	return this.toArray();
+	return this.toArray().toString();
 };
 
 
@@ -1209,6 +1390,215 @@ Tensor.prototype.softmax = function() {
 };
 
 
+// Do the conservative thing, and return a copy for now.
+Tensor.prototype.transpose = function() {
+  assert.ok(this.rank === 2);
+  var h = this.dims[0];
+  var w = this.dims[1];
+  var y = new Tensor([w, h]);
+  for (var i = 0; i < h; i++) {
+    for (var j = 0; j < w; j++) {
+      y.data[j * h + i] = this.data[i * w + j];
+    }
+  }
+  return y;
+};
+
+Tensor.prototype.diagonal = function() {
+  assert.ok(this.rank === 2);
+  assert.ok(this.dims[1] === 1);
+  var n = this.dims[0];
+  var y = new Tensor([n, n]);
+  for (var i = 0; i < n; i++) {
+    y.data[i * (n + 1)] = this.data[i];
+  }
+  return y;
+};
+
+// Matrix inverse.
+// Ported from numeric.js.
+Tensor.prototype.inverse = function() {
+
+  assert.ok(this.rank === 2);
+  assert.ok(this.dims[0] === this.dims[1]);
+  var n = this.dims[0];
+
+  var Ai, Aj;
+  var Ii, Ij;
+  var i, j, k, x;
+
+  var A = [];
+  for (i = 0; i < n; i++) {
+    Ai = new Float64Array(n);
+    A.push(Ai);
+    for (j = 0; j < n; j++) {
+      Ai[j] = this.data[i * n + j];
+    }
+  }
+
+  // Not using Float64 here as I want the convinience of passing I to
+  // fromArray() which doesn't currently work with Float64Array.
+  var I = [];
+  for (i = 0; i < n; i++) {
+    Ii = new Array(n);
+    I.push(Ii);
+    for (j = 0; j < n; j++) {
+      Ii[j] = i === j ? 1 : 0;
+    }
+  }
+
+  for (j = 0; j < n; ++j) {
+    var i0 = -1;
+    var v0 = -1;
+    for (i = j; i !== n; ++i) {
+      k = Math.abs(A[i][j]);
+      if (k > v0) {
+        i0 = i; v0 = k;
+      }
+    }
+    Aj = A[i0];
+    A[i0] = A[j];
+    A[j] = Aj;
+    Ij = I[i0];
+    I[i0] = I[j];
+    I[j] = Ij;
+    x = Aj[j];
+    for (k = j; k !== n; ++k) {
+      Aj[k] /= x;
+    }
+    for (k = n - 1; k !== -1; --k) {
+      Ij[k] /= x;
+    }
+    for (i = n - 1; i !== -1; --i) {
+      if (i !== j) {
+        Ai = A[i];
+        Ii = I[i];
+        x = Ai[j];
+        for (k = j + 1; k !== n; ++k) {
+          Ai[k] -= Aj[k] * x;
+        }
+        for (k = n - 1; k > 0; --k) {
+          Ii[k] -= Ij[k] * x;
+          --k;
+          Ii[k] -= Ij[k] * x;
+        }
+        if (k === 0) {
+          Ii[0] -= Ij[0] * x;
+        }
+      }
+    }
+  }
+  return new Tensor([n, n]).fromArray(I);
+};
+
+// Determinant.
+// Ported from numeric.js.
+Tensor.prototype.determinant = function() {
+  assert.ok(this.rank === 2);
+  assert.ok(this.dims[0] === this.dims[1]);
+  var n = this.dims[0];
+  var ret = 1;
+
+  var i, j, k;
+  var Aj, Ai, alpha, temp, k1, k2, k3;
+
+  var A = [];
+  for (i = 0; i < n; i++) {
+    Ai = new Float64Array(n);
+    A.push(Ai);
+    for (j = 0; j < n; j++) {
+      Ai[j] = this.data[i * n + j];
+    }
+  }
+
+  for (j = 0; j < n - 1; j++) {
+    k = j;
+    for (i = j + 1; i < n; i++) {
+      if (Math.abs(A[i][j]) > Math.abs(A[k][j])) {
+        k = i;
+      }
+    }
+    if (k !== j) {
+      temp = A[k];
+      A[k] = A[j];
+      A[j] = temp;
+      ret *= -1;
+    }
+    Aj = A[j];
+    for (i = j + 1; i < n; i++) {
+      Ai = A[i];
+      alpha = Ai[j] / Aj[j];
+      for (k = j + 1; k < n - 1; k += 2) {
+        k1 = k + 1;
+        Ai[k] -= Aj[k] * alpha;
+        Ai[k1] -= Aj[k1] * alpha;
+      }
+      if (k !== n) {
+        Ai[k] -= Aj[k] * alpha;
+      }
+    }
+    if (Aj[j] === 0) {
+      return 0;
+    }
+    ret *= Aj[j];
+  }
+  return ret * A[j][j];
+};
+
+Tensor.prototype.dot = function(t) {
+  var a = this, b = t;
+
+  if (a.rank !== 2 || b.rank !== 2) {
+    throw new Error('Inputs to dot should have rank = 2.');
+  }
+  if (a.dims[1] !== b.dims[0]) {
+    throw new Error('Dimension mismatch in dot. Inputs have dimension ' + a.dims + ' and ' + b.dims + '.');
+  }
+
+  var l = a.dims[1];
+  var h = a.dims[0], w = b.dims[1];
+  var y = new Tensor([h, w]);
+
+  for (var r = 0; r < h; r++) {
+    for (var c = 0; c < w; c++) {
+      var z = 0;
+      for (var i = 0; i < l; i++) {
+        z += a.data[r * l + i] * b.data[w * i + c];
+      }
+      y.data[r * w + c] = z;
+    }
+  }
+  return y;
+};
+
+Tensor.prototype.cholesky = function() {
+  var a = this;
+  assert.ok((a.rank === 2) && (a.dims[0] === a.dims[1]),
+            'cholesky is only defined for square matrices.');
+
+  // If a isn't positive-definite then the result will silently
+  // include NaNs, no warning is given.
+
+  var s;
+  var n = a.dims[0];
+  var L = new Tensor([n, n]);
+
+  for (var i = 0; i < n; i++) {
+    for (var j = 0; j <= i; j++) {
+      s = 0;
+      for (var k = 0; k < j; k++) {
+        s += L.data[i * n + k] * L.data[j * n + k];
+      }
+      L.data[i * n + j] = (i === j) ?
+          Math.sqrt(a.data[i * n + i] - s) :
+          1 / L.data[j * n + j] * (a.data[i * n + j] - s);
+    }
+  }
+
+  return L;
+};
+
+
 module.exports = Tensor;
 
 
@@ -1216,20 +1606,6 @@ module.exports = Tensor;
 
 },{"./utils.js":8,"assert":192}],8:[function(require,module,exports){
 'use strict';
-
-// Simple single-arg function memoization using stringified keys
-function memoize(fn) {
-	var cache = {};
-	return function(x) {
-		var key = x instanceof Function ? x.toString() : JSON.stringify(x);
-		var y = cache[key];
-		if (y === undefined) {
-			y = fn(x);
-			cache[key] = y;
-		}
-		return y;
-	};
-}
 
 function gaussianSample(mu, sigma) {
 	var u, v, x, y, q;
@@ -1254,12 +1630,37 @@ function deduplicate(list) {
 	return retlist;
 }
 
+// source objects from which to copy are in arguments[1] - arguments[arguments.length-1]
+function mergeObjects(tgt) {
+	tgt = tgt || {};
+	for (var i = 1; i < arguments.length; i++) {
+		var src = arguments[i];
+		for (var prop in src) {
+			tgt[prop] = src[prop];
+		}
+	}
+	return tgt;
+}
+
+function cloneObject(obj) {
+	return mergeObjects({}, obj);
+}
+
+function mergeDefaults(obj, defaults) {
+	return mergeObjects({}, defaults, obj);
+}
+
 
 module.exports = {
-	memoize: memoize,
 	gaussianSample: gaussianSample,
-	deduplicate: deduplicate
+	deduplicate: deduplicate,
+	mergeObjects: mergeObjects,
+	cloneObject: cloneObject,
+	mergeDefaults: mergeDefaults
 };
+
+
+
 },{}],9:[function(require,module,exports){
 (function (process,__filename){
 /** vim: et:ts=4:sw=4:sts=4
@@ -30243,6 +30644,9 @@ arguments[4][90][0].apply(exports,arguments)
     }
     var type = typeof o;
     if (type === 'number') {
+      if (o !== o || o === Infinity) {
+        return 0;
+      }
       var h = o | 0;
       if (h !== o) {
         h ^= o * 0xFFFFFFFF;
@@ -33581,21 +33985,6 @@ arguments[4][90][0].apply(exports,arguments)
       return entry ? entry[1] : notSetValue;
     },
 
-    findEntry: function(predicate, context, notSetValue) {
-      var found = notSetValue;
-      this.__iterate(function(v, k, c)  {
-        if (predicate.call(context, v, k, c)) {
-          found = [k, v];
-          return false;
-        }
-      });
-      return found;
-    },
-
-    findLastEntry: function(predicate, context, notSetValue) {
-      return this.toSeq().reverse().findEntry(predicate, context, notSetValue);
-    },
-
     forEach: function(sideEffect, context) {
       assertNotInfinite(this.size);
       return this.__iterate(context ? sideEffect.bind(context) : sideEffect);
@@ -33706,8 +34095,32 @@ arguments[4][90][0].apply(exports,arguments)
       return this.filter(not(predicate), context);
     },
 
+    findEntry: function(predicate, context, notSetValue) {
+      var found = notSetValue;
+      this.__iterate(function(v, k, c)  {
+        if (predicate.call(context, v, k, c)) {
+          found = [k, v];
+          return false;
+        }
+      });
+      return found;
+    },
+
+    findKey: function(predicate, context) {
+      var entry = this.findEntry(predicate, context);
+      return entry && entry[0];
+    },
+
     findLast: function(predicate, context, notSetValue) {
       return this.toKeyedSeq().reverse().find(predicate, context, notSetValue);
+    },
+
+    findLastEntry: function(predicate, context, notSetValue) {
+      return this.toKeyedSeq().reverse().findEntry(predicate, context, notSetValue);
+    },
+
+    findLastKey: function(predicate, context) {
+      return this.toKeyedSeq().reverse().findKey(predicate, context);
     },
 
     first: function() {
@@ -33768,12 +34181,20 @@ arguments[4][90][0].apply(exports,arguments)
       return iter.isSubset(this);
     },
 
+    keyOf: function(searchValue) {
+      return this.findKey(function(value ) {return is(value, searchValue)});
+    },
+
     keySeq: function() {
       return this.toSeq().map(keyMapper).toIndexedSeq();
     },
 
     last: function() {
       return this.toSeq().reverse().first();
+    },
+
+    lastKeyOf: function(searchValue) {
+      return this.toKeyedSeq().reverse().keyOf(searchValue);
     },
 
     max: function(comparator) {
@@ -33874,23 +34295,6 @@ arguments[4][90][0].apply(exports,arguments)
       return reify(this, flipFactory(this));
     },
 
-    findKey: function(predicate, context) {
-      var entry = this.findEntry(predicate, context);
-      return entry && entry[0];
-    },
-
-    findLastKey: function(predicate, context) {
-      return this.toSeq().reverse().findKey(predicate, context);
-    },
-
-    keyOf: function(searchValue) {
-      return this.findKey(function(value ) {return is(value, searchValue)});
-    },
-
-    lastKeyOf: function(searchValue) {
-      return this.findLastKey(function(value ) {return is(value, searchValue)});
-    },
-
     mapEntries: function(mapper, context) {var this$0 = this;
       var iterations = 0;
       return reify(this,
@@ -33939,12 +34343,12 @@ arguments[4][90][0].apply(exports,arguments)
     },
 
     indexOf: function(searchValue) {
-      var key = this.toKeyedSeq().keyOf(searchValue);
+      var key = this.keyOf(searchValue);
       return key === undefined ? -1 : key;
     },
 
     lastIndexOf: function(searchValue) {
-      var key = this.toKeyedSeq().reverse().keyOf(searchValue);
+      var key = this.lastKeyOf(searchValue);
       return key === undefined ? -1 : key;
     },
 
@@ -33979,8 +34383,8 @@ arguments[4][90][0].apply(exports,arguments)
     // ### More collection methods
 
     findLastIndex: function(predicate, context) {
-      var key = this.toKeyedSeq().findLastKey(predicate, context);
-      return key === undefined ? -1 : key;
+      var entry = this.findLastEntry(predicate, context);
+      return entry ? entry[0] : -1;
     },
 
     first: function() {
@@ -34019,6 +34423,10 @@ arguments[4][90][0].apply(exports,arguments)
         interleaved.size = zipped.size * iterables.length;
       }
       return reify(this, interleaved);
+    },
+
+    keySeq: function() {
+      return Range(0, this.size);
     },
 
     last: function() {
@@ -34106,7 +34514,7 @@ arguments[4][90][0].apply(exports,arguments)
   }
 
   function quoteString(value) {
-    return typeof value === 'string' ? JSON.stringify(value) : value;
+    return typeof value === 'string' ? JSON.stringify(value) : String(value);
   }
 
   function defaultZipper() {
@@ -56194,27 +56602,98 @@ module.exports = ad;
 
 },{"adnn/ad":5,"underscore":151}],153:[function(require,module,exports){
 'use strict';
+
+var _ = require('underscore');
+var util = require('../util');
+var ad = require('../ad');
+var dists = require('../dists');
+
+var CountAggregator = function() {
+  this.hist = {};
+};
+
+CountAggregator.prototype.add = function(value) {
+  var k = util.serialize(value);
+  if (this.hist[k] === undefined) {
+    this.hist[k] = { count: 0, val: value };
+  }
+  this.hist[k].count += 1;
+};
+
+function normalize(hist) {
+  var totalCount = _.reduce(hist, function(acc, obj) {
+    return acc + obj.count;
+  }, 0);
+  return _.mapObject(hist, function(obj) {
+    return { val: obj.val, prob: obj.count / totalCount };
+  });
+}
+
+CountAggregator.prototype.toDist = function() {
+  return new dists.Marginal({dist: normalize(this.hist)});
+};
+
+module.exports = CountAggregator;
+
+},{"../ad":152,"../dists":162,"../util":190,"underscore":151}],154:[function(require,module,exports){
+'use strict';
+
+var _ = require('underscore');
+var util = require('../util');
+var ad = require('../ad');
+var CountAggregator = require('../aggregation/CountAggregator');
+
+var MaxAggregator = function(retainSamples) {
+  this.max = { value: undefined, score: -Infinity };
+  this.samples = [];
+  this.retainSamples = retainSamples;
+};
+
+MaxAggregator.prototype.add = function(value, score) {
+  if (this.retainSamples) {
+    this.samples.push({ value: value, score: score });
+  }
+  if (score > this.max.score) {
+    this.max.value = value;
+    this.max.score = score;
+  }
+};
+
+MaxAggregator.prototype.toDist = function() {
+  var hist = new CountAggregator();
+  hist.add(this.max.value);
+  var dist = hist.toDist();
+  if (this.retainSamples) {
+    dist.samples = this.samples;
+  }
+  return dist;
+};
+
+module.exports = MaxAggregator;
+
+},{"../ad":152,"../aggregation/CountAggregator":153,"../util":190,"underscore":151}],155:[function(require,module,exports){
+'use strict';
 var ad = require('../ad.js');
 var assert = require('assert');
 var _ = require('underscore');
-var erp = require('../erp');
+var dists = require('../dists');
 var util = require('../util');
 function logsumexp(a, b) {
     assert.ok(ad.scalar.pneq(a, ad.scalar.sub(0, Infinity)) || ad.scalar.pneq(b, ad.scalar.sub(0, Infinity)));
     var m = ad.scalar.max(a, b);
     return ad.scalar.add(ad.scalar.log(ad.scalar.add(ad.scalar.exp(ad.scalar.sub(a, m)), ad.scalar.exp(ad.scalar.sub(b, m)))), m);
 }
-var Distribution = function () {
+var ScoreAggregator = function () {
     this.dist = {};
 };
-Object.defineProperties(Distribution.prototype, {
+Object.defineProperties(ScoreAggregator.prototype, {
     size: {
         get: function () {
             return _.size(this.dist);
         }
     }
 });
-Distribution.prototype.add = function (value, score) {
+ScoreAggregator.prototype.add = function (value, score) {
     if (ad.scalar.peq(score, ad.scalar.sub(0, Infinity))) {
         return;
     }
@@ -56238,85 +56717,11 @@ function normalize(dist) {
         };
     });
 }
-Distribution.prototype.toERP = function () {
-    return erp.makeMarginalERP(normalize(this.dist));
+ScoreAggregator.prototype.toDist = function () {
+    return new dists.Marginal({ dist: normalize(this.dist) });
 };
-module.exports = Distribution;
-},{"../ad.js":152,"../erp":162,"../util":190,"assert":192,"underscore":151}],154:[function(require,module,exports){
-'use strict';
-
-var _ = require('underscore');
-var util = require('../util');
-var ad = require('../ad');
-var erp = require('../erp');
-
-var Histogram = function() {
-  this.hist = {};
-};
-
-Histogram.prototype.add = function(value) {
-  var value = ad.valueRec(value);
-  var k = util.serialize(value);
-  if (this.hist[k] === undefined) {
-    this.hist[k] = { count: 0, val: value };
-  }
-  this.hist[k].count += 1;
-};
-
-function normalize(hist) {
-  var totalCount = _.reduce(hist, function(acc, obj) {
-    return acc + obj.count;
-  }, 0);
-  return _.mapObject(hist, function(obj) {
-    return { val: obj.val, prob: obj.count / totalCount };
-  });
-}
-
-Histogram.prototype.toERP = function() {
-  return erp.makeMarginalERP(normalize(this.hist));
-};
-
-module.exports = Histogram;
-
-},{"../ad":152,"../erp":162,"../util":190,"underscore":151}],155:[function(require,module,exports){
-'use strict';
-
-var _ = require('underscore');
-var util = require('../util');
-var ad = require('../ad');
-var Histogram = require('./histogram');
-
-var MAP = function(retainSamples) {
-  this.max = { value: undefined, score: -Infinity };
-  this.samples = [];
-  this.retainSamples = retainSamples;
-};
-
-MAP.prototype.add = function(value, score) {
-  var value = ad.valueRec(value);
-  var score = ad.value(score);
-  if (this.retainSamples) {
-    this.samples.push({ value: value, score: score });
-  }
-  if (score > this.max.score) {
-    this.max.value = value;
-    this.max.score = score;
-  }
-};
-
-MAP.prototype.toERP = function() {
-  var hist = new Histogram();
-  hist.add(this.max.value);
-  var erp = hist.toERP();
-  if (this.retainSamples) {
-    erp.samples = this.samples;
-  }
-  return erp;
-};
-
-module.exports = MAP;
-
-},{"../ad":152,"../util":190,"./histogram":154,"underscore":151}],156:[function(require,module,exports){
+module.exports = ScoreAggregator;
+},{"../ad.js":152,"../dists":162,"../util":190,"assert":192,"underscore":151}],156:[function(require,module,exports){
 'use strict';
 
 var traverse = require('estraverse').traverse;
@@ -57195,7 +57600,7 @@ var naming = require('./transforms/naming').naming;
 var thunkify = require('./syntax').thunkify;
 var cps = require('./transforms/cps').cps;
 var analyze = require('./analysis/main').analyze;
-var version = 'v0.6.2-0557d8b';
+var version = 'v0.7.0-28af23e';
 var packages = [];
 var load = _.once(function () {
     packages.forEach(function (pkg) {
@@ -57248,174 +57653,239 @@ var numeric = require('numeric');
 var _ = require('underscore');
 var util = require('./util');
 var assert = require('assert');
+var inspect = require('util').inspect;
 var LOG_PI = 1.1447298858494002;
 var LOG_2PI = 1.8378770664093453;
-function ERP(obj) {
-    assert(obj.sample && obj.score, 'ERP must implement sample and score.');
-    _.extendOwn(this, obj);
+function Distribution() {
 }
-ERP.prototype.isContinuous = false;
-ERP.prototype.MAP = function () {
-    if (this.isContinuous || !this.support) {
-        throw 'Can only compute MAP for ERPs with finite support.';
-    }
-    var supp = this.support([]);
-    var mapEst = {
-        val: undefined,
-        prob: 0
-    };
-    for (var i = 0, l = supp.length; i < l; i++) {
-        var sp = supp[i];
-        var sc = Math.exp(this.score([], sp));
-        if (sc > mapEst.prob)
-            mapEst = {
-                val: sp,
-                prob: sc
-            };
-    }
-    this.MAP = function () {
-        return mapEst;
-    };
-    return mapEst;
+Distribution.prototype = {
+    toJSON: function () {
+        throw 'Not implemented';
+    },
+    inspect: function (depth, options) {
+        if (_.has(this, 'params')) {
+            return [
+                this.meta.name,
+                '(',
+                inspect(this.params),
+                ')'
+            ].join('');
+        } else {
+            var opts = options ? _.clone(options) : {};
+            opts.customInspect = false;
+            return inspect(this, opts);
+        }
+    },
+    toString: function () {
+        return this.inspect();
+    },
+    isContinuous: false,
+    constructor: Distribution
 };
-ERP.prototype.entropy = function () {
-    if (this.isContinuous || !this.support) {
-        throw 'Can only compute entropy for ERPs with finite support.';
-    }
-    var supp = this.support([]);
-    var e = 0;
-    for (var i = 0, l = supp.length; i < l; i++) {
-        var lp = this.score([], supp[i]);
-        e -= Math.exp(lp) * lp;
-    }
-    this.entropy = function () {
-        return e;
-    };
-    return e;
+function isDist(x) {
+    return x instanceof Distribution;
+}
+function clone(dist) {
+    return new dist.constructor(dist.params);
+}
+var serialize = function (dist) {
+    return util.serialize(dist);
 };
-ERP.prototype.parameterized = true;
-ERP.prototype.withParameters = function (params) {
-    var erp = new ERP(this);
-    var sampler = this.sample;
-    erp.sample = function (ps) {
-        return sampler(params);
-    };
-    var scorer = this.score;
-    erp.score = function (ps, val) {
-        return scorer(params, val);
-    };
-    if (this.support) {
-        var support = this.support;
-        erp.support = function (ps) {
-            return support(params);
-        };
+var deserialize = function (JSONString) {
+    var obj = util.deserialize(JSONString);
+    if (!obj.probs || !obj.support) {
+        throw 'Cannot deserialize a non-distribution JSON object: ' + JSONString;
     }
-    erp.parameterized = false;
-    return erp;
+    return new Categorical({
+        ps: obj.probs,
+        vs: obj.support
+    });
 };
-ERP.prototype.isSerializeable = function () {
-    return !this.isContinuous && this.support && !this.parameterized;
-};
-ERP.prototype.toJSON = function () {
-    if (this.isSerializeable()) {
-        var support = this.support([]);
-        var probs = support.map(function (s) {
-            return Math.exp(this.score([], s));
+function isParams(x) {
+    return typeof x === 'object' && !Array.isArray(x) && !ad.isLifted(x) && x !== null;
+}
+var finiteSupport = {
+    MAP: function () {
+        var map = { score: -Infinity };
+        this.support().forEach(function (val) {
+            var score = this.score(val);
+            if (score > map.score) {
+                map = {
+                    val: val,
+                    score: score
+                };
+            }
         }, this);
-        var erpJSON = {
+        return map;
+    },
+    entropy: function () {
+        return _.reduce(this.support(), function (memo, x) {
+            var score = this.score(x);
+            return memo - (score === -Infinity ? 0 : Math.exp(score) * score);
+        }, 0, this);
+    },
+    toJSON: function () {
+        var support = this.support();
+        var probs = support.map(function (s) {
+            return Math.exp(this.score(s));
+        }, this);
+        return {
             probs: probs,
             support: support
         };
-        this.toJSON = function () {
-            return erpJSON;
+    }
+};
+var continuousSupport = { isContinuous: true };
+var methodNames = [
+    'sample',
+    'score',
+    'support',
+    'grad',
+    'print',
+    'driftKernel'
+];
+function makeDistributionType(options) {
+    options = util.mergeDefaults(options, {
+        parent: Distribution,
+        mixins: []
+    });
+    [
+        'name',
+        'params'
+    ].forEach(function (name) {
+        if (!_.has(options, name)) {
+            console.log(options);
+            throw 'makeDistributionType: ' + name + ' is required.';
+        }
+    });
+    if (options.score) {
+        var originalScoreFn = options.score;
+        options.score = function (val) {
+            if (arguments.length !== 1) {
+                throw 'The score method of ' + this.meta.name + ' expected 1 argument but received ' + arguments.length + '.';
+            }
+            return originalScoreFn.call(this, val);
         };
-        return erpJSON;
-    } else {
-        throw 'Cannot serialize ' + this.name + ' ERP.';
     }
-};
-ERP.prototype.print = function () {
-    if (this.isSerializeable()) {
-        console.log('ERP:');
-        var json = this.toJSON();
-        _.zip(json.probs, json.support).sort(function (a, b) {
-            return b[0] - a[0];
-        }).forEach(function (val) {
-            console.log('    ' + util.serialize(val[1]) + ' : ' + val[0]);
-        });
-    } else {
-        console.log('[ERP: ' + this.name + ']');
-    }
-};
-var serializeERP = function (erp) {
-    return util.serialize(erp);
-};
-var deserializeERP = function (JSONString) {
-    var obj = util.deserialize(JSONString);
-    if (!obj.probs || !obj.support) {
-        throw 'Cannot deserialize a non-ERP JSON object: ' + JSONString;
-    }
-    return makeCategoricalERP(obj.probs, obj.support, _.omit(obj, 'probs', 'support'));
-};
-var uniformERP = new ERP({
-    sample: function (params) {
+    var parameterNames = _.pluck(options.params, 'name');
+    var extraConstructorFn = options.constructor;
+    var dist = function (params) {
+        if (params === undefined) {
+            throw 'Parameters not supplied to ' + this.meta.name + ' distribution.';
+        }
+        parameterNames.forEach(function (p) {
+            if (!params.hasOwnProperty(p)) {
+                throw 'Parameter "' + p + '" missing from ' + this.meta.name + ' distribution.';
+            }
+        }, this);
+        this.params = params;
+        if (extraConstructorFn !== undefined) {
+            extraConstructorFn.call(this);
+        }
+    };
+    dist.prototype = Object.create(options.parent.prototype);
+    dist.prototype.constructor = dist;
+    dist.prototype.meta = _.pick(options, 'name', 'desc', 'params', 'internal');
+    _.extendOwn.apply(_, [dist.prototype].concat(options.mixins));
+    _.extendOwn(dist.prototype, _.pick(options, methodNames));
+    [
+        'sample',
+        'score'
+    ].forEach(function (method) {
+        if (!dist.prototype[method]) {
+            throw 'makeDistributionType: method "' + method + '" not defined for ' + options.name;
+        }
+    });
+    return dist;
+}
+var Uniform = makeDistributionType({
+    name: 'Uniform',
+    desc: 'Continuous uniform distribution on [a, b]',
+    params: [
+        { name: 'a' },
+        { name: 'b' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
         var u = util.random();
-        return (1 - u) * params[0] + u * params[1];
+        return (1 - u) * ad.value(this.params.a) + u * ad.value(this.params.b);
     },
-    score: function (params, val) {
-        if (ad.scalar.lt(val, params[0]) || ad.scalar.gt(val, params[1])) {
+    score: function (val) {
+        if (ad.scalar.lt(val, this.params.a) || ad.scalar.gt(val, this.params.b)) {
             return ad.scalar.sub(0, Infinity);
         }
-        return ad.scalar.sub(0, ad.scalar.log(ad.scalar.sub(params[1], params[0])));
+        return ad.scalar.sub(0, ad.scalar.log(ad.scalar.sub(this.params.b, this.params.a)));
     },
-    support: function (params) {
+    support: function () {
         return {
-            lower: params[0],
-            upper: params[1]
+            lower: this.params.a,
+            upper: this.params.b
         };
-    },
-    isContinuous: true
+    }
 });
-var bernoulliERP = new ERP({
-    sample: function (params) {
-        var weight = params[0];
-        var val = util.random() < weight;
-        return val;
+var UniformDrift = makeDistributionType({
+    name: 'UniformDrift',
+    params: [
+        { name: 'a' },
+        { name: 'b' },
+        {
+            name: 'r',
+            desc: 'drift kernel radius'
+        }
+    ],
+    parent: Uniform,
+    driftKernel: function (prevVal) {
+        var r = this.params.r === undefined ? 0.1 : this.params.r;
+        return new Uniform({
+            a: Math.max(prevVal - r, this.params.a),
+            b: Math.min(prevVal + r, this.params.b)
+        });
+    }
+});
+var Bernoulli = makeDistributionType({
+    name: 'Bernoulli',
+    desc: 'Distribution on {true,false}',
+    params: [{
+            name: 'p',
+            desc: 'probability of true'
+        }],
+    mixins: [finiteSupport],
+    sample: function () {
+        return util.random() < ad.value(this.params.p);
     },
-    score: function (params, val) {
+    score: function (val) {
         if (ad.scalar.pneq(val, true) && ad.scalar.pneq(val, false)) {
             return ad.scalar.sub(0, Infinity);
         }
-        var weight = params[0];
-        return val ? ad.scalar.log(weight) : ad.scalar.log(ad.scalar.sub(1, weight));
+        return val ? ad.scalar.log(this.params.p) : ad.scalar.log(ad.scalar.sub(1, this.params.p));
     },
-    support: function (params) {
+    support: function () {
         return [
             true,
             false
         ];
     },
-    grad: function (params, val) {
-        var weight = params[0];
-        return val ? [1 / weight] : [-1 / weight];
+    grad: function (val) {
+        return val ? [1 / this.params.p] : [-1 / this.params.p];
     }
 });
-var randomIntegerERP = new ERP({
-    sample: function (params) {
-        return Math.floor(util.random() * params[0]);
+var RandomInteger = makeDistributionType({
+    name: 'RandomInteger',
+    desc: 'Uniform distribution on {0,1,...,n-1}',
+    params: [{ name: 'n' }],
+    mixins: [finiteSupport],
+    sample: function () {
+        return Math.floor(util.random() * this.params.n);
     },
-    score: function (params, val) {
-        var stop = params[0];
-        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, stop);
-        return inSupport ? ad.scalar.sub(0, ad.scalar.log(stop)) : ad.scalar.sub(0, Infinity);
+    score: function (val) {
+        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, this.params.n);
+        return inSupport ? ad.scalar.sub(0, ad.scalar.log(this.params.n)) : ad.scalar.sub(0, Infinity);
     },
-    support: function (params) {
-        return _.range(params[0]);
+    support: function () {
+        return _.range(this.params.n);
     }
 });
-function gaussianSample(params) {
-    var mu = params[0];
-    var sigma = params[1];
+function gaussianSample(mu, sigma) {
     var u, v, x, y, q;
     do {
         u = 1 - util.random();
@@ -57426,24 +57896,52 @@ function gaussianSample(params) {
     } while (q >= 0.27597 && (q > 0.27846 || v * v > -4 * u * u * Math.log(u)));
     return mu + sigma * v / u;
 }
-function gaussianScore(params, x) {
-    var mu = params[0];
-    var sigma = params[1];
+function gaussianScore(mu, sigma, x) {
     return ad.scalar.mul(ad.scalar.sub(0, 0.5), ad.scalar.add(ad.scalar.add(LOG_2PI, ad.scalar.mul(2, ad.scalar.log(sigma))), ad.scalar.div(ad.scalar.mul(ad.scalar.sub(x, mu), ad.scalar.sub(x, mu)), ad.scalar.mul(sigma, sigma))));
 }
-var gaussianERP = new ERP({
-    sample: gaussianSample,
-    score: gaussianScore,
-    isContinuous: true
+var Gaussian = makeDistributionType({
+    name: 'Gaussian',
+    params: [
+        {
+            name: 'mu',
+            desc: 'mean'
+        },
+        {
+            name: 'sigma',
+            desc: 'standard deviation'
+        }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
+        return gaussianSample(ad.value(this.params.mu), ad.value(this.params.sigma));
+    },
+    score: function (x) {
+        return gaussianScore(this.params.mu, this.params.sigma, x);
+    }
 });
-function multivariateGaussianSample(params) {
-    var mu = params[0];
-    var cov = params[1];
+var GaussianDrift = makeDistributionType({
+    name: 'GaussianDrift',
+    params: [
+        {
+            name: 'mu',
+            desc: 'mean'
+        },
+        {
+            name: 'sigma',
+            desc: 'standard deviation'
+        }
+    ],
+    parent: Gaussian,
+    driftKernel: function (curVal) {
+        return new Gaussian({
+            mu: curVal,
+            sigma: this.params.sigma * 0.7
+        });
+    }
+});
+function multivariateGaussianSample(mu, cov) {
     var xs = mu.map(function () {
-        return gaussianSample([
-            0,
-            1
-        ]);
+        return gaussianSample(0, 1);
     });
     var svd = numeric.svd(cov);
     var scaledV = numeric.transpose(svd.V).map(function (x) {
@@ -57452,52 +57950,72 @@ function multivariateGaussianSample(params) {
     xs = numeric.dot(xs, numeric.transpose(scaledV));
     return numeric.add(xs, mu);
 }
-function multivariateGaussianScore(params, x) {
-    var mu = params[0];
-    var cov = params[1];
+function multivariateGaussianScore(mu, cov, x) {
     var n = mu.length;
     var coeffs = n * LOG_2PI + Math.log(numeric.det(cov));
     var xSubMu = numeric.sub(x, mu);
     var exponents = numeric.dot(numeric.dot(xSubMu, numeric.inv(cov)), xSubMu);
     return -0.5 * (coeffs + exponents);
 }
-var multivariateGaussianERP = new ERP({
-    sample: multivariateGaussianSample,
-    score: multivariateGaussianScore,
-    isContinuous: false
+var MultivariateGaussian = makeDistributionType({
+    name: 'MultivariateGaussian',
+    params: [
+        {
+            name: 'mu',
+            desc: 'mean vector'
+        },
+        {
+            name: 'cov',
+            desc: 'covariance matrix'
+        }
+    ],
+    sample: function () {
+        return multivariateGaussianSample(this.params.mu, this.params.cov);
+    },
+    score: function (val) {
+        return multivariateGaussianScore(this.params.mu, this.params.cov, val);
+    }
 });
-var cauchyERP = new ERP({
-    sample: function (params) {
-        var location = params[0];
-        var scale = params[1];
+var Cauchy = makeDistributionType({
+    name: 'Cauchy',
+    params: [
+        { name: 'location' },
+        { name: 'scale' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
         var u = util.random();
-        return location + scale * Math.tan(180 * (u - 0.5));
+        return ad.value(this.params.location) + ad.value(this.params.scale) * Math.tan(180 * (u - 0.5));
     },
-    score: function (params, x) {
-        var location = params[0];
-        var scale = params[1];
+    score: function (x) {
+        var scale = this.params.scale;
+        var location = this.params.location;
         return ad.scalar.sub(ad.scalar.sub(ad.scalar.sub(0, LOG_PI), ad.scalar.log(scale)), ad.scalar.log(ad.scalar.add(1, ad.scalar.pow(ad.scalar.div(ad.scalar.sub(x, location), scale), 2))));
-    },
-    isContinuous: true
+    }
 });
 function sum(xs) {
     return xs.reduce(function (a, b) {
         return ad.scalar.add(a, b);
     }, 0);
 }
-;
-var discreteERP = new ERP({
-    sample: function (params) {
-        return discreteSample(params[0]);
+var Discrete = makeDistributionType({
+    name: 'Discrete',
+    desc: 'Distribution on {0,1,...,ps.length-1} with P(i) proportional to ps[i]',
+    params: [{
+            name: 'ps',
+            desc: 'array of probabilities'
+        }],
+    mixins: [finiteSupport],
+    sample: function () {
+        return discreteSample(this.params.ps.map(ad.value));
     },
-    score: function (params, val) {
-        var probs = params[0];
-        var stop = probs.length;
-        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, stop);
-        return inSupport ? ad.scalar.log(ad.scalar.div(probs[val], sum(probs))) : ad.scalar.sub(0, Infinity);
+    score: function (val) {
+        var n = this.params.ps.length;
+        var inSupport = ad.scalar.peq(val, ad.scalar.floor(val)) && ad.scalar.leq(0, val) && ad.scalar.lt(val, n);
+        return inSupport ? ad.scalar.log(ad.scalar.div(this.params.ps[val], sum(this.params.ps))) : ad.scalar.sub(0, Infinity);
     },
     support: function (params) {
-        return _.range(params[0].length);
+        return _.range(this.params.ps.length);
     }
 });
 var gammaCof = [
@@ -57519,15 +58037,10 @@ function logGamma(xx) {
     }
     return ad.scalar.add(ad.scalar.sub(0, tmp), ad.scalar.log(ad.scalar.mul(2.5066282746310007, ser)));
 }
-function gammaSample(params) {
-    var shape = params[0];
-    var scale = params[1];
+function gammaSample(shape, scale) {
     if (shape < 1) {
         var r;
-        r = gammaSample([
-            1 + shape,
-            scale
-        ]) * Math.pow(util.random(), 1 / shape);
+        r = gammaSample(1 + shape, scale) * Math.pow(util.random(), 1 / shape);
         if (r === 0) {
             util.warn('gamma sample underflow, rounded to nearest representable support value');
             return Number.MIN_VALUE;
@@ -57539,10 +58052,7 @@ function gammaSample(params) {
     var c = 1 / Math.sqrt(9 * d);
     while (true) {
         do {
-            x = gaussianSample([
-                0,
-                1
-            ]);
+            x = gaussianSample(0, 1);
             v = 1 + c * x;
         } while (v <= 0);
         v = v * v * v;
@@ -57552,15 +58062,10 @@ function gammaSample(params) {
         }
     }
 }
-function expGammaSample(params) {
-    var shape = params[0];
-    var scale = params[1];
+function expGammaSample(shape, scale) {
     if (shape < 1) {
         var r;
-        r = gammaSample([
-            1 + shape,
-            scale
-        ]) + Math.log(util.random()) / shape;
+        r = gammaSample(1 + shape, scale) + Math.log(util.random()) / shape;
         if (r === -Infinity) {
             util.warn('log gamma sample underflow, rounded to nearest representable support value');
             return -Number.MAX_VALUE;
@@ -57572,10 +58077,7 @@ function expGammaSample(params) {
     var c = 1 / Math.sqrt(9 * d);
     while (true) {
         do {
-            x = gaussianSample([
-                0,
-                1
-            ]);
+            x = gaussianSample(0, 1);
             v = 1 + c * x;
         } while (v <= 0);
         log_v = 3 * Math.log(v);
@@ -57586,18 +58088,23 @@ function expGammaSample(params) {
         }
     }
 }
-function expGammaScore(params, val) {
-    var shape = params[0];
-    var scale = params[1];
+function expGammaScore(shape, scale, val) {
     var x = val;
     return ad.scalar.sub(ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(ad.scalar.sub(shape, 1), x), ad.scalar.div(ad.scalar.exp(x), scale)), logGamma(shape)), ad.scalar.mul(shape, ad.scalar.log(scale)));
 }
-var gammaERP = new ERP({
-    sample: gammaSample,
-    score: function (params, val) {
-        var shape = params[0];
-        var scale = params[1];
-        var x = val;
+var Gamma = makeDistributionType({
+    name: 'Gamma',
+    params: [
+        { name: 'shape' },
+        { name: 'scale' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
+        return gammaSample(ad.value(this.params.shape), ad.value(this.params.scale));
+    },
+    score: function (x) {
+        var shape = this.params.shape;
+        var scale = this.params.scale;
         return ad.scalar.sub(ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(ad.scalar.sub(shape, 1), ad.scalar.log(x)), ad.scalar.div(x, scale)), logGamma(shape)), ad.scalar.mul(shape, ad.scalar.log(scale)));
     },
     support: function () {
@@ -57605,48 +58112,45 @@ var gammaERP = new ERP({
             lower: 0,
             upper: Infinity
         };
-    },
-    isContinuous: true
+    }
 });
-var exponentialERP = new ERP({
-    sample: function (params) {
-        var a = params[0];
+var Exponential = makeDistributionType({
+    name: 'Exponential',
+    params: [{
+            name: 'a',
+            desc: 'rate'
+        }],
+    mixins: [continuousSupport],
+    sample: function () {
         var u = util.random();
-        return Math.log(u) / (-1 * a);
+        return Math.log(u) / (-1 * ad.value(this.params.a));
     },
-    score: function (params, val) {
-        var a = params[0];
-        return ad.scalar.sub(ad.scalar.log(a), ad.scalar.mul(a, val));
+    score: function (val) {
+        return ad.scalar.sub(ad.scalar.log(this.params.a), ad.scalar.mul(this.params.a, val));
     },
-    support: function (params) {
+    support: function () {
         return {
             lower: 0,
             upper: Infinity
         };
-    },
-    isContinuous: true
+    }
 });
 function logBeta(a, b) {
     return ad.scalar.sub(ad.scalar.add(logGamma(a), logGamma(b)), logGamma(ad.scalar.add(a, b)));
 }
-function betaSample(params) {
-    var a = params[0];
-    var b = params[1];
-    var x = gammaSample([
-        a,
-        1
-    ]);
-    return x / (x + gammaSample([
-        b,
-        1
-    ]));
-}
-var betaERP = new ERP({
-    sample: betaSample,
-    score: function (params, val) {
-        var a = params[0];
-        var b = params[1];
-        var x = val;
+var Beta = makeDistributionType({
+    name: 'Beta',
+    params: [
+        { name: 'a' },
+        { name: 'b' }
+    ],
+    mixins: [continuousSupport],
+    sample: function () {
+        return betaSample(ad.value(this.params.a), ad.value(this.params.b));
+    },
+    score: function (x) {
+        var a = this.params.a;
+        var b = this.params.b;
         return ad.scalar.gt(x, 0) && ad.scalar.lt(x, 1) ? ad.scalar.sub(ad.scalar.add(ad.scalar.mul(ad.scalar.sub(a, 1), ad.scalar.log(x)), ad.scalar.mul(ad.scalar.sub(b, 1), ad.scalar.log(ad.scalar.sub(1, x)))), logBeta(a, b)) : ad.scalar.sub(0, Infinity);
     },
     support: function () {
@@ -57654,9 +58158,12 @@ var betaERP = new ERP({
             lower: 0,
             upper: 1
         };
-    },
-    isContinuous: true
+    }
 });
+function betaSample(a, b) {
+    var x = gammaSample(a, 1);
+    return x / (x + gammaSample(b, 1));
+}
 function binomialG(x) {
     if (ad.scalar.peq(x, 0)) {
         return 1;
@@ -57667,19 +58174,14 @@ function binomialG(x) {
     var d = ad.scalar.sub(1, x);
     return ad.scalar.div(ad.scalar.add(ad.scalar.sub(1, ad.scalar.mul(x, x)), ad.scalar.mul(ad.scalar.mul(2, x), ad.scalar.log(x))), ad.scalar.mul(d, d));
 }
-function binomialSample(params) {
-    var p = params[0];
-    var n = params[1];
+function binomialSample(p, n) {
     var k = 0;
     var N = 10;
     var a, b;
     while (n > N) {
         a = 1 + n / 2;
         b = 1 + n - a;
-        var x = betaSample([
-            a,
-            b
-        ]);
+        var x = betaSample(a, b);
         if (x >= p) {
             n = a - 1;
             p /= x;
@@ -57698,40 +58200,30 @@ function binomialSample(params) {
     }
     return k || 0;
 }
-var binomialERP = new ERP({
-    sample: binomialSample,
-    score: function (params, val) {
-        var p = params[0];
-        var n = params[1];
-        if (ad.scalar.gt(n, 20) && ad.scalar.gt(ad.scalar.mul(n, p), 5) && ad.scalar.gt(ad.scalar.mul(n, ad.scalar.sub(1, p)), 5)) {
-            var s = val;
-            var inv2 = ad.scalar.div(1, 2);
-            var inv3 = ad.scalar.div(1, 3);
-            var inv6 = ad.scalar.div(1, 6);
-            if (ad.scalar.geq(s, n)) {
-                return ad.scalar.sub(0, Infinity);
-            }
-            var q = ad.scalar.sub(1, p);
-            var S = ad.scalar.add(s, inv2);
-            var T = ad.scalar.sub(ad.scalar.sub(n, s), inv2);
-            var d1 = ad.scalar.sub(ad.scalar.add(s, inv6), ad.scalar.mul(ad.scalar.add(n, inv3), p));
-            var d2 = ad.scalar.add(ad.scalar.sub(ad.scalar.div(q, ad.scalar.add(s, inv2)), ad.scalar.div(p, ad.scalar.add(T, inv2))), ad.scalar.div(ad.scalar.sub(q, inv2), ad.scalar.add(n, 1)));
-            d2 = ad.scalar.add(d1, ad.scalar.mul(0.02, d2));
-            var num = ad.scalar.add(ad.scalar.add(1, ad.scalar.mul(q, binomialG(ad.scalar.div(S, ad.scalar.mul(n, p))))), ad.scalar.mul(p, binomialG(ad.scalar.div(T, ad.scalar.mul(n, q)))));
-            var den = ad.scalar.mul(ad.scalar.mul(ad.scalar.add(n, inv6), p), q);
-            var z = ad.scalar.div(num, den);
-            var invsd = ad.scalar.sqrt(z);
-            z = ad.scalar.mul(d2, invsd);
-            return ad.scalar.add(gaussianScore([
-                0,
-                1
-            ], z), ad.scalar.log(invsd));
-        } else {
-            return ad.scalar.add(ad.scalar.add(ad.scalar.sub(ad.scalar.sub(lnfact(n), lnfact(ad.scalar.sub(n, val))), lnfact(val)), ad.scalar.mul(val, ad.scalar.log(p))), ad.scalar.mul(ad.scalar.sub(n, val), ad.scalar.log(ad.scalar.sub(1, p))));
+var Binomial = makeDistributionType({
+    name: 'Binomial',
+    desc: 'Distribution over the number of successes for n independent ``Bernoulli({p: p})`` trials',
+    params: [
+        {
+            name: 'p',
+            desc: 'success probability'
+        },
+        {
+            name: 'n',
+            desc: 'number of trials'
         }
+    ],
+    mixins: [finiteSupport],
+    sample: function () {
+        return binomialSample(ad.value(this.params.p), this.params.n);
     },
-    support: function (params) {
-        return _.range(params[1]).concat([params[1]]);
+    score: function (val) {
+        var p = this.params.p;
+        var n = this.params.n;
+        return ad.scalar.add(ad.scalar.add(ad.scalar.sub(ad.scalar.sub(lnfact(n), lnfact(ad.scalar.sub(n, val))), lnfact(val)), ad.scalar.mul(val, ad.scalar.log(p))), ad.scalar.mul(ad.scalar.sub(n, val), ad.scalar.log(ad.scalar.sub(1, p))));
+    },
+    support: function () {
+        return _.range(this.params.n).concat(this.params.n);
     }
 });
 function zeros(n) {
@@ -57741,39 +58233,47 @@ function zeros(n) {
     }
     return a;
 }
-function multinomialSample(params) {
-    var theta = params[0];
-    var n = params[1];
-    var thetaSum = util.sum(theta);
+function multinomialSample(theta, n) {
     var a = zeros(theta.length);
     for (var i = 0; i < n; i++) {
         a[discreteSample(theta)]++;
     }
     return a;
 }
-var multinomialERP = new ERP({
-    sample: multinomialSample,
-    score: function (params, val) {
-        var probs = params[0];
-        var n = params[1];
-        if (sum(val) != n) {
-            return -Infinity;
+var Multinomial = makeDistributionType({
+    name: 'Multinomial',
+    desc: 'Distribution over counts for n independent ``Discrete({ps: ps})`` trials',
+    params: [
+        {
+            name: 'ps',
+            desc: 'probabilities'
+        },
+        {
+            name: 'n',
+            desc: 'number of trials'
+        }
+    ],
+    mixins: [finiteSupport],
+    sample: function () {
+        return multinomialSample(this.params.ps.map(ad.value), this.params.n);
+    },
+    score: function (val) {
+        if (ad.scalar.pneq(sum(val), this.params.n)) {
+            return ad.scalar.sub(0, Infinity);
         }
         var x = [];
         var y = [];
-        for (var i = 0; i < probs.length; i++) {
+        for (var i = 0; ad.scalar.lt(i, this.params.ps.length); i = ad.scalar.add(i, 1)) {
             x[i] = lnfact(val[i]);
-            y[i] = val[i] * Math.log(probs[i]);
+            y[i] = ad.scalar.mul(val[i], ad.scalar.log(this.params.ps[i]));
         }
-        return lnfact(n) - sum(x) + sum(y);
+        return ad.scalar.add(ad.scalar.sub(lnfact(this.params.n), sum(x)), sum(y));
     },
-    support: function (params) {
-        var probs = params[0];
-        var k = params[1];
-        var combinations = allDiscreteCombinations(k, probs, [], 0);
+    support: function () {
+        var combinations = allDiscreteCombinations(this.params.n, this.params.ps, [], 0);
         var toHist = function (l) {
-            return buildHistogramFromCombinations(l, probs);
-        };
+            return buildHistogramFromCombinations(l, this.params.ps);
+        }.bind(this);
         var hists = combinations.map(toHist);
         return hists;
     }
@@ -57830,21 +58330,17 @@ function lnfact(x) {
     sum = ad.scalar.add(sum, ad.scalar.sub(ad.scalar.div(invx5, 1260), ad.scalar.div(invx7, 1680)));
     return sum;
 }
-var poissonERP = new ERP({
-    sample: function (params) {
-        var mu = params[0];
+var Poisson = makeDistributionType({
+    name: 'Poisson',
+    params: [{ name: 'mu' }],
+    sample: function () {
         var k = 0;
+        var mu = ad.value(this.params.mu);
         while (mu > 10) {
             var m = 7 / 8 * mu;
-            var x = gammaSample([
-                m,
-                1
-            ]);
+            var x = gammaSample(m, 1);
             if (x > mu) {
-                return k + binomialSample([
-                    mu / x,
-                    m - 1
-                ]) || 0;
+                return k + binomialSample(mu / x, m - 1) || 0;
             } else {
                 mu -= x;
                 k += m;
@@ -57858,33 +58354,32 @@ var poissonERP = new ERP({
         } while (p > emu);
         return k - 1 || 0;
     },
-    score: function (params, val) {
-        var mu = params[0];
-        var k = val;
-        return ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(k, ad.scalar.log(mu)), mu), lnfact(k));
-    },
-    isContinuous: false
+    score: function (val) {
+        return ad.scalar.sub(ad.scalar.sub(ad.scalar.mul(val, ad.scalar.log(this.params.mu)), this.params.mu), lnfact(val));
+    }
 });
-function dirichletSample(params) {
-    var alpha = params;
+function dirichletSample(alpha) {
+    var n = alpha.length;
     var ssum = 0;
     var theta = [];
     var t;
-    for (var i = 0; i < alpha.length; i++) {
-        t = gammaSample([
-            alpha[i],
-            1
-        ]);
+    for (var i = 0; i < n; i++) {
+        t = gammaSample(alpha[i], 1);
         theta[i] = t;
         ssum = ssum + t;
     }
-    for (var j = 0; j < theta.length; j++) {
+    for (var j = 0; j < n; j++) {
         theta[j] /= ssum;
+        if (theta[j] === 0) {
+            theta[j] = Number.EPSILON;
+        }
+        if (theta[j] === 1) {
+            theta[j] = 1 - Number.EPSILON;
+        }
     }
     return theta;
 }
-function dirichletScore(params, val) {
-    var alpha = params;
+function dirichletScore(alpha, val) {
     var theta = val;
     var asum = 0;
     for (var i = 0; i < alpha.length; i++) {
@@ -57897,10 +58392,33 @@ function dirichletScore(params, val) {
     }
     return logp;
 }
-var dirichletERP = new ERP({
-    sample: dirichletSample,
-    score: dirichletScore,
-    isContinuous: false
+var Dirichlet = makeDistributionType({
+    name: 'Dirichlet',
+    params: [{
+            name: 'alpha',
+            desc: 'array of concentration parameters'
+        }],
+    sample: function () {
+        return dirichletSample(this.params.alpha);
+    },
+    score: function (val) {
+        return dirichletScore(this.params.alpha, val);
+    }
+});
+var DirichletDrift = makeDistributionType({
+    name: 'DirichletDrift',
+    parent: Dirichlet,
+    params: [{
+            name: 'alpha',
+            desc: 'array of concentration parameters'
+        }],
+    driftKernel: function (prevVal) {
+        var concentration = 10;
+        var alpha = prevVal.map(function (x) {
+            return concentration * x;
+        });
+        return new Dirichlet({ alpha: alpha });
+    }
 });
 function discreteSample(theta) {
     var thetaSum = util.sum(theta);
@@ -57915,194 +58433,150 @@ function discreteSample(theta) {
     }
     return k - 1;
 }
-function makeMarginalERP(marginal) {
-    var norm = _.reduce(marginal, function (acc, obj) {
-        return ad.scalar.add(acc, obj.prob);
-    }, 0);
-    assert.ok(ad.scalar.lt(ad.scalar.abs(ad.scalar.sub(1, norm)), 1e-8), 'Expected marginal to be normalized.');
-    var support = _.map(marginal, function (obj) {
-        return obj.val;
-    });
-    return new ERP({
-        sample: function (params) {
-            var x = util.random();
-            var probAccum = 0;
-            for (var i in marginal) {
-                if (marginal.hasOwnProperty(i)) {
-                    probAccum = ad.scalar.add(probAccum, marginal[i].prob);
-                    if (ad.scalar.lt(x, probAccum)) {
-                        return marginal[i].val;
-                    }
+var Marginal = makeDistributionType({
+    name: 'Marginal',
+    internal: true,
+    params: [{ name: 'dist' }],
+    mixins: [finiteSupport],
+    constructor: function () {
+        var norm = _.reduce(this.params.dist, function (acc, obj) {
+            return ad.scalar.add(acc, obj.prob);
+        }, 0);
+        assert.ok(ad.scalar.lt(ad.scalar.abs(ad.scalar.sub(1, norm)), 1e-8), 'Expected marginal distribution to be normalized.');
+        this.supp = _.map(this.params.dist, function (obj) {
+            return obj.val;
+        });
+    },
+    sample: function () {
+        var x = util.random();
+        var dist = this.params.dist;
+        var probAccum = 0;
+        for (var i in dist) {
+            if (dist.hasOwnProperty(i)) {
+                probAccum = ad.scalar.add(probAccum, dist[i].prob);
+                if (ad.scalar.lt(x, probAccum)) {
+                    return dist[i].val;
                 }
             }
-            return marginal[i].val;
+        }
+        return this.params.dist[i].val;
+    },
+    score: function (val) {
+        var obj = this.params.dist[util.serialize(val)];
+        return obj ? ad.scalar.log(obj.prob) : ad.scalar.sub(0, Infinity);
+    },
+    support: function () {
+        return this.supp;
+    },
+    print: function () {
+        return _.map(this.params.dist, function (obj, val) {
+            return [
+                val,
+                obj.prob
+            ];
+        }).sort(function (a, b) {
+            return b[1] - a[1];
+        }).map(function (pair) {
+            return '    ' + pair[0] + ' : ' + pair[1];
+        }).join('\n');
+    }
+});
+var Categorical = makeDistributionType({
+    name: 'Categorical',
+    desc: 'Distribution over elements of vs with P(vs[i]) = ps[i]',
+    params: [
+        {
+            name: 'ps',
+            desc: 'array of probabilities'
         },
-        score: function (params, val) {
-            var obj = marginal[util.serialize(val)];
-            return obj ? ad.scalar.log(obj.prob) : ad.scalar.sub(0, Infinity);
-        },
-        support: function (params) {
-            return support;
-        },
-        parameterized: false,
-        name: 'marginal',
-        hist: marginal
-    });
-}
-var makeCategoricalERP = function (ps, vs, extraParams) {
-    var dist = {};
-    vs.forEach(function (v, i) {
-        dist[util.serialize(v)] = {
-            val: v,
-            prob: ps[i]
-        };
-    });
-    var categoricalSample = vs.length === 1 ? function (params) {
-        return vs[0];
-    } : function (params) {
+        {
+            name: 'vs',
+            desc: 'support'
+        }
+    ],
+    mixins: [finiteSupport],
+    constructor: function () {
+        this.dist = _.object(this.params.vs.map(function (v, i) {
+            return [
+                util.serialize(v),
+                {
+                    val: v,
+                    prob: this.params.ps[i]
+                }
+            ];
+        }, this));
+    },
+    sample: function () {
+        var vs = this.params.vs.map(ad.value);
+        var ps = this.params.ps.map(ad.value);
         return vs[discreteSample(ps)];
-    };
-    return new ERP(_.extendOwn({
-        sample: categoricalSample,
-        score: function (params, val) {
-            var lk = dist[util.serialize(val)];
-            return lk ? ad.scalar.log(lk.prob) : ad.scalar.sub(0, Infinity);
-        },
-        support: function (params) {
-            return vs;
-        },
-        parameterized: false,
-        name: 'categorical'
-    }, extraParams));
-};
-var makeMultiplexERP = function (vs, erps) {
-    var stringifiedVals = vs.map(util.serialize);
-    var selectERP = function (params) {
-        var stringifiedV = util.serialize(params[0]);
-        var i = _.indexOf(stringifiedVals, stringifiedV);
-        if (i === -1) {
-            return undefined;
-        } else {
-            return erps[i];
-        }
-    };
-    return new ERP({
-        sample: function (params) {
-            var erp = selectERP(params);
-            assert.notEqual(erp, undefined);
-            return erp.sample();
-        },
-        score: function (params, val) {
-            var erp = selectERP(params);
-            if (ad.scalar.peq(erp, undefined)) {
-                return ad.scalar.sub(0, Infinity);
-            } else {
-                return erp.score([], val);
-            }
-        },
-        support: function (params) {
-            var erp = selectERP(params);
-            return erp.support();
-        },
-        name: 'multiplex'
-    });
-};
-function gaussianProposalParams(params, prevVal) {
-    var mu = prevVal;
-    var sigma = params[1] * 0.7;
-    return [
-        mu,
-        sigma
-    ];
-}
-function dirichletProposalParams(params, prevVal) {
-    var concentration = 10;
-    var driftParams = prevVal.map(function (x) {
-        return concentration * x;
-    });
-    return driftParams;
-}
-function buildProposer(baseERP, getProposalParams) {
-    return new ERP({
-        sample: function (params) {
-            var baseParams = params[0];
-            var prevVal = params[1];
-            var proposalParams = getProposalParams(baseParams, prevVal);
-            return baseERP.sample(proposalParams);
-        },
-        score: function (params, val) {
-            var baseParams = params[0];
-            var prevVal = params[1];
-            var proposalParams = getProposalParams(baseParams, prevVal);
-            return baseERP.score(proposalParams, val);
-        },
-        isContinuous: true
-    });
-}
-var gaussianProposerERP = buildProposer(gaussianERP, gaussianProposalParams);
-var dirichletProposerERP = buildProposer(dirichletERP, dirichletProposalParams);
-var gaussianDriftERP = new ERP({
-    sample: gaussianERP.sample,
-    score: gaussianERP.score,
-    proposer: gaussianProposerERP,
-    isContinuous: true
+    },
+    score: function (val) {
+        var obj = this.dist[util.serialize(val)];
+        return obj ? ad.scalar.log(obj.prob) : ad.scalar.sub(0, Infinity);
+    },
+    support: function () {
+        return this.params.vs;
+    }
 });
-var dirichletDriftERP = new ERP({
-    sample: dirichletERP.sample,
-    score: dirichletERP.score,
-    proposer: dirichletProposerERP,
-    isContinuous: false
+var Delta = makeDistributionType({
+    name: 'Delta',
+    desc: 'Discrete distribution that assigns probability one to the single ' + 'element in its support. This is only useful in special circumstances as sampling ' + 'from ``Delta({v: val})`` can be replaced with ``val`` itself. Furthermore, a ``Delta`` ' + 'distribution parameterized by a random choice should not be used with MCMC based inference, ' + 'as doing so produces incorrect results.',
+    params: [{
+            name: 'v',
+            desc: 'support element'
+        }],
+    mixins: [finiteSupport],
+    constructor: function () {
+        this.v = util.serialize(this.params.v);
+    },
+    sample: function () {
+        return ad.value(this.params.v);
+    },
+    score: function (val) {
+        return util.serialize(val) === this.v ? 0 : -Infinity;
+    },
+    support: function () {
+        return [this.params.v];
+    }
 });
-function withImportanceDist(s, k, a, erp, importanceERP) {
-    var newERP = _.clone(erp);
-    newERP.importanceERP = importanceERP;
-    return k(s, newERP);
+function withImportanceDist(dist, importanceDist) {
+    var newDist = clone(dist);
+    newDist.importanceDist = importanceDist;
+    return newDist;
 }
-function isErp(x) {
-    return x && _.isFunction(x.score) && _.isFunction(x.sample);
-}
-function isErpWithSupport(x) {
-    return isErp(x) && _.isFunction(x.support);
-}
-function setErpNames(exports) {
-    return _.each(exports, function (val, key) {
-        if (isErp(val)) {
-            val.name = key.replace(/ERP$/, '');
-        }
-    });
-}
-module.exports = setErpNames({
-    ERP: ERP,
-    serializeERP: serializeERP,
-    deserializeERP: deserializeERP,
-    bernoulliERP: bernoulliERP,
-    betaERP: betaERP,
-    binomialERP: binomialERP,
-    dirichletERP: dirichletERP,
-    discreteERP: discreteERP,
-    multinomialERP: multinomialERP,
-    exponentialERP: exponentialERP,
-    gammaERP: gammaERP,
-    gaussianERP: gaussianERP,
+module.exports = {
+    Uniform: Uniform,
+    UniformDrift: UniformDrift,
+    Bernoulli: Bernoulli,
+    RandomInteger: RandomInteger,
+    Gaussian: Gaussian,
+    GaussianDrift: GaussianDrift,
+    MultivariateGaussian: MultivariateGaussian,
+    Cauchy: Cauchy,
+    Discrete: Discrete,
+    Gamma: Gamma,
+    Exponential: Exponential,
+    Beta: Beta,
+    Binomial: Binomial,
+    Multinomial: Multinomial,
+    Poisson: Poisson,
+    Dirichlet: Dirichlet,
+    DirichletDrift: DirichletDrift,
+    Marginal: Marginal,
+    Categorical: Categorical,
+    Delta: Delta,
     discreteSample: discreteSample,
-    multinomialSample: multinomialSample,
-    multivariateGaussianERP: multivariateGaussianERP,
-    cauchyERP: cauchyERP,
-    poissonERP: poissonERP,
-    randomIntegerERP: randomIntegerERP,
-    uniformERP: uniformERP,
-    makeMarginalERP: makeMarginalERP,
-    makeCategoricalERP: makeCategoricalERP,
-    makeMultiplexERP: makeMultiplexERP,
-    gaussianDriftERP: gaussianDriftERP,
-    dirichletDriftERP: dirichletDriftERP,
-    gaussianProposerERP: gaussianProposerERP,
-    dirichetProposerERP: dirichletProposerERP,
+    gaussianSample: gaussianSample,
+    gammaSample: gammaSample,
+    dirichletSample: dirichletSample,
+    serialize: serialize,
+    deserialize: deserialize,
     withImportanceDist: withImportanceDist,
-    isErp: isErp,
-    isErpWithSupport: isErpWithSupport
-});
-},{"./ad.js":152,"./util":190,"assert":192,"numeric":109,"underscore":151}],163:[function(require,module,exports){
+    isDist: isDist,
+    isParams: isParams
+};
+},{"./ad.js":152,"./util":190,"assert":192,"numeric":109,"underscore":151,"util":406}],163:[function(require,module,exports){
 /**
  * @license jahashtable, a JavaScript implementation of a hash table. It creates a single constructor function called
  * Hashtable in the global scope.
@@ -58544,8 +59018,8 @@ module.exports = {
 //
 // An inference function takes the current continuation and a WebPPL
 // thunk (which itself has been transformed to take a
-// continuation). It does some kind of inference and returns an ERP
-// representing the nromalized marginal distribution on return values.
+// continuation). It does some kind of inference and returns a distribution
+// representing the normalized marginal distribution on return values.
 //
 // The inference function should install a coroutine object that
 // provides sample, factor, and exit.
@@ -58564,7 +59038,7 @@ var _ = require('underscore');
 
 try {
   var util = require('./util');
-  var erp = require('./erp');
+  var dists = require('./dists');
   var enumerate = require('./inference/enumerate');
   var mcmc = require('./inference/mcmc');
   var asyncpf = require('./inference/asyncpf');
@@ -58592,8 +59066,8 @@ module.exports = function(env) {
   // Inference interface
 
   env.coroutine = {
-    sample: function(s, k, a, erp, params) {
-      return k(s, erp.sample(params));
+    sample: function(s, k, a, dist) {
+      return k(s, dist.sample());
     },
     factor: function() {
       throw 'factor allowed only inside inference.';
@@ -58609,8 +59083,11 @@ module.exports = function(env) {
 
   env.defaultCoroutine = env.coroutine;
 
-  env.sample = function(s, k, a, erp, params) {
-    return env.coroutine.sample(s, k, a, erp, params);
+  env.sample = function(s, k, a, dist) {
+    if (!dists.isDist(dist)) {
+      throw 'sample() expected a distribution but received \"' + JSON.stringify(dist) + '\".';
+    }
+    return env.coroutine.sample(s, k, a, dist);
   };
 
   env.factor = function(s, k, a, score) {
@@ -58618,9 +59095,9 @@ module.exports = function(env) {
     return env.coroutine.factor(s, k, a, score);
   };
 
-  env.sampleWithFactor = function(s, k, a, erp, params, scoreFn) {
+  env.sampleWithFactor = function(s, k, a, dist, scoreFn) {
     if (typeof env.coroutine.sampleWithFactor === 'function') {
-      return env.coroutine.sampleWithFactor(s, k, a, erp, params, scoreFn);
+      return env.coroutine.sampleWithFactor(s, k, a, dist, scoreFn);
     } else {
       var sampleK = function(s, v) {
         var scoreK = function(s, sc) {
@@ -58631,7 +59108,7 @@ module.exports = function(env) {
         };
         return scoreFn(s, scoreK, a + 'swf1', v);
       };
-      return env.sample(s, sampleK, a, erp, params);
+      return env.sample(s, sampleK, a, dist);
     }
   };
 
@@ -58672,7 +59149,8 @@ module.exports = function(env) {
     _: _,
     util: util,
     assert: assert,
-    ad: ad
+    ad: ad,
+    dists: dists
   });
 
   // Inference functions and header utils
@@ -58684,15 +59162,12 @@ module.exports = function(env) {
     addExports(mod(env));
   });
 
-  // Random primitives
-  addExports(erp);
-
   return exports;
 
 };
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./ad":152,"./erp":162,"./headerUtils":165,"./inference/asyncpf":166,"./inference/enumerate":167,"./inference/incrementalmh":169,"./inference/mcmc":172,"./inference/pmcmc":174,"./inference/rejection":175,"./inference/smc":176,"./inference/variational":177,"./query":179,"./util":190,"_process":389,"assert":192,"underscore":151}],165:[function(require,module,exports){
+},{"./ad":152,"./dists":162,"./headerUtils":165,"./inference/asyncpf":166,"./inference/enumerate":167,"./inference/incrementalmh":169,"./inference/mcmc":172,"./inference/pmcmc":174,"./inference/rejection":175,"./inference/smc":176,"./inference/variational":177,"./query":179,"./util":190,"_process":389,"assert":192,"underscore":151}],165:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -58779,7 +59254,7 @@ module.exports = function(env) {
 
 var _ = require('underscore');
 var util = require('../util');
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 
 module.exports = function(env) {
 
@@ -58809,9 +59284,10 @@ module.exports = function(env) {
     };
   }
 
-  function AsyncPF(s, k, a, wpplFn, numParticles, bufferSize) {
+  function AsyncPF(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'AsyncPF');
     this.numParticles = 0;      // K_0 -- initialized here, set in run
-    this.bufferSize = bufferSize == undefined ? numParticles : bufferSize; // \rho
+    this.bufferSize = options.bufferSize == undefined ? options.particles : options.bufferSize; // \rho
     this.initNumParticles = Math.floor(this.bufferSize * (1 / 2));         // \rho_0
     this.exitK = function(s) {return wpplFn(s, env.exit, a);};
     this.store = s;
@@ -58822,7 +59298,7 @@ module.exports = function(env) {
 
     this.obsWeights = {};
     this.exitedParticles = 0;
-    this.hist = new Histogram();
+    this.hist = new CountAggregator();
 
     // Move old coroutine out of the way and install this as current handler.
     this.k = k;
@@ -58854,8 +59330,8 @@ module.exports = function(env) {
     return p.continuation(p.store);
   };
 
-  AsyncPF.prototype.sample = function(s, cc, a, erp, params) {
-    return cc(s, erp.sample(params));
+  AsyncPF.prototype.sample = function(s, cc, a, dist) {
+    return cc(s, dist.sample());
   };
 
   AsyncPF.prototype.factor = function(s, cc, a, score) {
@@ -58939,7 +59415,7 @@ module.exports = function(env) {
     if (this.exitedParticles < this.numParticles) {
       return this.run();
     } else {
-      var dist = this.hist.toERP();
+      var dist = this.hist.toDist();
 
       var lastFactorIndex = this.activeParticle.factorIndex;
       var olk = this.obsWeights[lastFactorIndex];
@@ -58967,8 +59443,9 @@ module.exports = function(env) {
 
   AsyncPF.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  function asyncPF(s, cc, a, wpplFn, numParticles, bufferSize) {
-    return new AsyncPF(s, cc, a, wpplFn, numParticles, bufferSize).run(numParticles);
+  function asyncPF(s, cc, a, wpplFn, options) {
+    options = options || {};
+    return new AsyncPF(s, cc, a, wpplFn, options).run(options.particles);
   }
 
   return {
@@ -58977,24 +59454,27 @@ module.exports = function(env) {
 
 };
 
-},{"../aggregation/histogram":154,"../util":190,"underscore":151}],167:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../util":190,"underscore":151}],167:[function(require,module,exports){
 'use strict';
 var ad = require('../ad.js');
 var _ = require('underscore');
 var PriorityQueue = require('priorityqueuejs');
 var util = require('../util');
-var Distribution = require('../aggregation/distribution');
+var ScoreAggregator = require('../aggregation/ScoreAggregator');
 module.exports = function (env) {
-    function Enumerate(store, k, a, wpplFn, maxExecutions, Q) {
+    function Enumerate(store, k, a, wpplFn, options) {
+        util.throwUnlessOpts(options, 'Enumerate');
+        options = util.mergeDefaults(options, { maxExecutions: Infinity });
+        this.maxExecutions = options.maxExecutions;
         this.score = 0;
-        this.marginal = new Distribution();
+        this.marginal = new ScoreAggregator();
         this.numCompletedExecutions = 0;
         this.store = store;
         this.k = k;
         this.a = a;
         this.wpplFn = wpplFn;
-        this.maxExecutions = maxExecutions || Infinity;
-        this.queue = Q;
+        var strategy = strategies[options.strategy] || defaultStrategy(options.maxExecutions);
+        this.queue = strategy.makeQ();
         this.coroutine = env.coroutine;
         env.coroutine = this;
     }
@@ -59015,22 +59495,22 @@ module.exports = function (env) {
         };
         this.queue.enq(state);
     };
-    var getSupport = function (erp, params) {
-        if (erp.isContinuous || !erp.support) {
-            console.error(erp, params);
-            throw 'Enumerate can only be used with ERPs that have finite support.';
+    var getSupport = function (dist) {
+        if (dist.isContinuous || !dist.support) {
+            console.error(dist);
+            throw 'Enumerate can only be used with distributions that have finite support.';
         }
-        var supp = erp.support(params);
+        var supp = dist.support();
         if (ad.scalar.peq(supp.length, 0)) {
-            console.error(erp, params);
-            throw 'Enumerate encountered ERP with empty support!';
+            console.error(dist);
+            throw 'Enumerate encountered a distribution with empty support!';
         }
         return supp;
     };
-    Enumerate.prototype.sample = function (store, k, a, erp, params) {
-        var support = getSupport(erp, params);
+    Enumerate.prototype.sample = function (store, k, a, dist) {
+        var support = getSupport(dist);
         _.each(support, function (value) {
-            this.enqueueContinuation(k, value, ad.scalar.add(this.score, erp.score(params, value)), store);
+            this.enqueueContinuation(k, value, ad.scalar.add(this.score, dist.score(value)), store);
         }, this);
         return this.nextInQueue();
     };
@@ -59041,11 +59521,11 @@ module.exports = function (env) {
         }
         return k(s);
     };
-    Enumerate.prototype.sampleWithFactor = function (store, k, a, erp, params, scoreFn) {
-        var support = getSupport(erp, params);
+    Enumerate.prototype.sampleWithFactor = function (store, k, a, dist, scoreFn) {
+        var support = getSupport(dist);
         return util.cpsForEach(function (value, i, support$2, nextK) {
             return scoreFn(store, function (store$2, extraScore) {
-                var score = ad.scalar.add(ad.scalar.add(env.coroutine.score, erp.score(params, value)), extraScore);
+                var score = ad.scalar.add(ad.scalar.add(env.coroutine.score, dist.score(value)), extraScore);
                 env.coroutine.enqueueContinuation(k, value, score, store$2);
                 return nextK();
             }, a, value);
@@ -59063,46 +59543,51 @@ module.exports = function (env) {
                 throw 'All paths explored by Enumerate have probability zero.';
             }
             env.coroutine = this.coroutine;
-            return this.k(this.store, this.marginal.toERP());
+            return this.k(this.store, this.marginal.toDist());
         }
     };
     Enumerate.prototype.incrementalize = env.defaultCoroutine.incrementalize;
-    function enuPriority(s, k, a, wpplFn, maxExecutions) {
-        var q = new PriorityQueue(function (a$2, b) {
-            return ad.scalar.sub(a$2.score, b.score);
-        });
-        return new Enumerate(s, k, a, wpplFn, maxExecutions, q).run();
-    }
-    function enuFilo(s, k, a, wpplFn, maxExecutions) {
-        var q = [];
-        q.size = function () {
-            return q.length;
-        };
-        q.enq = q.push;
-        q.deq = q.pop;
-        return new Enumerate(s, k, a, wpplFn, maxExecutions, q).run();
-    }
-    function enuFifo(s, k, a, wpplFn, maxExecutions) {
-        var q = [];
-        q.size = function () {
-            return q.length;
-        };
-        q.enq = q.push;
-        q.deq = q.shift;
-        return new Enumerate(s, k, a, wpplFn, maxExecutions, q).run();
-    }
-    function enuDefault(s, k, a, wpplFn, maxExecutions) {
-        var enu = _.isFinite(maxExecutions) ? enuPriority : enuFilo;
-        return enu(s, k, a, wpplFn, maxExecutions);
+    var strategies = {
+        'likelyFirst': {
+            makeQ: function () {
+                return new PriorityQueue(function (a, b) {
+                    return ad.scalar.sub(a.score, b.score);
+                });
+            }
+        },
+        'depthFirst': {
+            makeQ: function () {
+                var q = [];
+                q.size = function () {
+                    return q.length;
+                };
+                q.enq = q.push;
+                q.deq = q.pop;
+                return q;
+            }
+        },
+        'breadthFirst': {
+            makeQ: function () {
+                var q = [];
+                q.size = function () {
+                    return q.length;
+                };
+                q.enq = q.push;
+                q.deq = q.shift;
+                return q;
+            }
+        }
+    };
+    function defaultStrategy(maxExecutions) {
+        return strategies[_.isFinite(maxExecutions) ? 'likelyFirst' : 'depthFirst'];
     }
     return {
-        Enumerate: enuDefault,
-        EnumerateBreadthFirst: enuFifo,
-        EnumerateDepthFirst: enuFilo,
-        EnumerateLikelyFirst: enuPriority
+        Enumerate: function (s, k, a, wpplFn, options) {
+            return new Enumerate(s, k, a, wpplFn, options).run();
+        }
     };
 };
-},{"../ad.js":152,"../aggregation/distribution":153,"../util":190,"priorityqueuejs":110,"underscore":151}],168:[function(require,module,exports){
+},{"../ad.js":152,"../aggregation/ScoreAggregator":155,"../util":190,"priorityqueuejs":110,"underscore":151}],168:[function(require,module,exports){
 // Neal, Radford M. "MCMC using Hamiltonian dynamics." Handbook of
 // Markov Chain Monte Carlo 2 (2011).
 // http://arxiv.org/abs/1206.1901
@@ -59112,13 +59597,13 @@ module.exports = function (env) {
 var _ = require('underscore');
 var assert = require('assert');
 var util = require('../util');
-var erp = require('../erp');
+var dists = require('../dists');
 var Trace = require('../trace');
 var ad = require('../ad');
 
 module.exports = function(env) {
 
-  var mvErpNames = ['multivariateGaussian', 'dirichlet', 'dirichletDrift'];
+  var mvDistNames = ['MultivariateGaussian', 'Dirichlet', 'DirichletDrift'];
 
   function HMCKernel(cont, oldTrace, options) {
     var options = util.mergeDefaults(options, {
@@ -59140,20 +59625,20 @@ module.exports = function(env) {
     env.coroutine = this;
   }
 
-  HMCKernel.prototype.sample = function(s, k, a, erp, params) {
+  HMCKernel.prototype.sample = function(s, k, a, dist) {
     var prevChoice = this.prevTrace.findChoice(a);
     if (!prevChoice) {
       throw 'HMC does not support structural continuous variables.';
     }
 
     var val;
-    if (erp.isContinuous) {
+    if (dist.isContinuous) {
       var prevVal = ad.value(prevChoice.val);
       var _val = prevVal + this.stepSize * this.momentum[a];
 
       // Handle constraints.
-      if (erp.support) {
-        var support = erp.support(params);
+      if (dist.support) {
+        var support = dist.support();
         var lower = support.lower;
         var upper = support.upper;
 
@@ -59170,13 +59655,13 @@ module.exports = function(env) {
       }
       val = ad.lift(_val);
     } else {
-      if (_.contains(mvErpNames, erp.name)) {
+      if (_.contains(mvDistNames, dist.meta.name)) {
         throw 'Multivariate distributions are not yet supported by HMC.';
       }
       val = prevChoice.val;
     }
 
-    this.trace.addChoice(erp, params, val, a, s, k);
+    this.trace.addChoice(dist, val, a, s, k);
     return k(s, val);
   };
 
@@ -59236,8 +59721,8 @@ module.exports = function(env) {
   function sampleMomentum(trace) {
     var momentum = {};
     _.each(trace.choices, function(choice) {
-      if (choice.erp.isContinuous) {
-        momentum[choice.address] = erp.gaussianERP.sample([0, 1]);
+      if (choice.dist.isContinuous) {
+        momentum[choice.address] = dists.gaussianSample(0, 1);
       }
     });
     return momentum;
@@ -59287,7 +59772,7 @@ module.exports = function(env) {
 
       var stepSize = this.stepSize * scaleFactor;
       _.each(trace.choices, function(choice) {
-        if (choice.erp.isContinuous) {
+        if (choice.dist.isContinuous) {
           this.momentum[choice.address] += stepSize * ad.derivative(choice.val);
         }
       }, this);
@@ -59324,7 +59809,7 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../erp":162,"../trace":181,"../util":190,"assert":192,"underscore":151}],169:[function(require,module,exports){
+},{"../ad":152,"../dists":162,"../trace":181,"../util":190,"assert":192,"underscore":151}],169:[function(require,module,exports){
 (function (global){
 ////////////////////////////////////////////////////////////////////
 // Incrementalized (i.e. caching) Lightweight MH
@@ -59336,8 +59821,8 @@ var assert = require('assert');
 var util = require('../util');
 var Hashtable = require('../hashtable').Hashtable
 var Query = require('../query').Query;
-var Histogram = require('../aggregation/histogram');
-var MAP = require('../aggregation/map');
+var CountAggregator = require('../aggregation/CountAggregator');
+var MaxAggregator = require('../aggregation/MaxAggregator');
 
 module.exports = function(env) {
 
@@ -59399,14 +59884,14 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  // A cached ERP call
-  function ERPNode(coroutine, parent, s, k, a, erp, params) {
+  // A cached distribution call
+  function DistNode(coroutine, parent, s, k, a, dist) {
     this.coroutine = coroutine;
 
     this.store = _.clone(s);
     this.continuation = k;
     this.address = a;
-    this.erp = erp;
+    this.dist = dist;
 
     this.parent = parent;
     this.depth = parent.depth + 1;
@@ -59415,32 +59900,31 @@ module.exports = function(env) {
     this.reachable = true;
     this.needsUpdate = false;
 
-    this.params = params;
-    this.val = erp.sample(params);
+    this.val = dist.sample();
     this.score = 0; this.rescore();
 
-    // Add this to the master list of ERP nodes
-    this.coroutine.addERP(this);
+    // Add this to the master list of distribution nodes
+    this.coroutine.addDist(this);
   }
 
-  ERPNode.prototype.print = function() {
-    tabbedlog(0, this.depth, 'ERPNode', this.erp.sample.name.slice(0, -6),
-              this.params, this.val, this.reachable ? '' : '!!UNREACHABLE!!');
+  DistNode.prototype.print = function() {
+    tabbedlog(0, this.depth, 'DistNode', this.dist,
+              this.val, this.reachable ? '' : '!!UNREACHABLE!!');
   };
 
-  ERPNode.prototype.execute = function() {
-    tabbedlog(4, this.depth, 'execute ERP');
+  DistNode.prototype.execute = function() {
+    tabbedlog(4, this.depth, 'execute distribution');
     if (this.needsUpdate) {
-      tabbedlog(4, this.depth, 'yes, ERP params changed');
-      tabbedlog(5, this.depth, 'old params:',
-          this.__snapshot ? this.__snapshot.params : undefined,
-          'new params:', this.params);
+      tabbedlog(4, this.depth, 'yes, dist changed');
+      tabbedlog(5, this.depth, 'old dist:',
+          this.__snapshot ? this.__snapshot.dist : undefined,
+          'new dist:', this.dist);
       this.needsUpdate = false;
       this.rescore();
     }
     else {
-      tabbedlog(4, this.depth, 'no, ERP params have not changed');
-      tabbedlog(5, this.depth, 'params:', this.params);
+      tabbedlog(4, this.depth, 'no, dist has not changed');
+      tabbedlog(5, this.depth, 'dist:', this.dist);
     }
     // Bail out early if we know proposal will be rejected
     if (this.score === -Infinity) {
@@ -59451,40 +59935,33 @@ module.exports = function(env) {
     }
   };
 
-  ERPNode.prototype.registerInputChanges = function(s, k, erp, params) {
+  DistNode.prototype.registerInputChanges = function(s, k, dist) {
     updateProperty(this, 'store', _.clone(s));
     updateProperty(this, 'continuation', k);
     updateProperty(this, 'index', this.parent.nextChildIdx);
     this.reachable = true;
-    // Check if ERP has changed
-    // TODO: Have ERPs provide 'equal' method to check whether they represent
-    //    the same distribution, even though they may refer to different objects.
-    if (erp !== this.erp) {
+    if (!distEqual(dist, this.dist)) {
       this.needsUpdate = true;
-      updateProperty(this, 'erp', erp);
-    }
-    // Check params for changes
-    if (!paramsEqual(params, this.params)) {
-      this.needsUpdate = true;
-      updateProperty(this, 'params', params);
+      updateProperty(this, 'dist', dist);
     }
   };
 
-  ERPNode.prototype.kontinue = function() {
+  DistNode.prototype.kontinue = function() {
     this.parent.notifyChildExecuted(this);
     // Call continuation
     // Copies store, so that we maintain a pristine copy of this.store
     return this.continuation(_.clone(this.store), this.val);
   };
 
-  ERPNode.prototype.killDescendantLeaves = function() {
-    this.coroutine.removeERP(this);
+  DistNode.prototype.killDescendantLeaves = function() {
+    this.coroutine.removeDist(this);
   };
 
-  ERPNode.prototype.propose = function() {
+  DistNode.prototype.propose = function() {
     var oldval = this.val;
-    var newval = this.erp.sample(this.params);
-    tabbedlog(4, this.depth, 'proposing change to ERP.', 'oldval:', oldval, 'newval:', newval);
+    var fwdPropDist = this.dist.driftKernel ? this.dist.driftKernel(oldval) : this.dist;
+    var newval = fwdPropDist.sample();
+    tabbedlog(4, this.depth, 'proposing change to distribution.', 'oldval:', oldval, 'newval:', newval);
     // If the value didn't change, then just bail out (we know the
     //    the proposal will be accepted)
     if (oldval === newval) {
@@ -59494,10 +59971,10 @@ module.exports = function(env) {
     } else {
       updateProperty(this, 'store', _.clone(this.store));
       updateProperty(this, 'val', newval);
-      var oldscore = this.score;
       this.rescore();
-      this.coroutine.rvsPropLP = oldscore;
-      this.coroutine.fwdPropLP = this.score;
+      var rvsPropDist = this.dist.driftKernel ? this.dist.driftKernel(newval) : this.dist;
+      this.coroutine.rvsPropLP = rvsPropDist.score(oldval);
+      this.coroutine.fwdPropLP = fwdPropDist.score(newval);
       tabbedlog(1, this.depth, 'initial rvsPropLP:', this.coroutine.rvsPropLP,
           'initial fwdPropLP:', this.coroutine.fwdPropLP);
       this.needsUpdate = false;
@@ -59516,11 +59993,45 @@ module.exports = function(env) {
     }
   };
 
-  ERPNode.prototype.rescore = function() {
+  DistNode.prototype.rescore = function() {
     var oldscore = this.score;
-    updateProperty(this, 'score', this.erp.score(this.params, this.val));
+    updateProperty(this, 'score', this.dist.score(this.val));
     this.coroutine.score += this.score - oldscore;
   };
+
+
+  // This is used to decide whether to re-score a distribution. Only a
+  // shallow check for parameter equality is performed, as a deep
+  // check is unlikely to be any faster than re-scoring.
+  function distEqual(dist1, dist2) {
+    return dist1.constructor === dist2.constructor &&
+        distParamsEqual(dist1.params, dist2.params);
+  }
+
+  function distParamsEqual(p1, p2) {
+    if (p1 === p2) {
+      return true;
+    }
+    //assert.strictEqual(_.size(p1), _.size(p2));
+    for (var k in p1) {
+      if (p1.hasOwnProperty(k)) {
+        //assert.ok(p2.hasOwnProperty(k));
+        var v1 = p1[k], v2 = p2[k];
+        if (typeof v1 === 'number') {
+          if (v1 !== v2) {
+            return false;
+          }
+        } else if (_.isArray(v1)) {
+          if (!_.isEqual(v1, v2)) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
   // ------------------------------------------------------------------
 
@@ -59593,21 +60104,6 @@ module.exports = function(env) {
     for (prop in s2) {
       if (s1[prop] !== s2[prop])
         return false;
-    }
-    return true;
-  }
-
-  function paramsEqual(p1, p2) {
-    if (p1 === p2) {
-      return true;
-    } else if (p1 === undefined || p2 === undefined) {
-      return false;
-    } else if (p1.length !== p2.length) {
-      return false;
-    } else {
-      for (var i = 0; i < p1.length; i++) {
-        if (p1[i] !== p2[i]) { return false; }
-      }
     }
     return true;
   }
@@ -59872,107 +60368,107 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  // Abstraction representing a master list of ERPs
+  // Abstraction representing a master list of distributions
   // (lets us abstract over whether we're using an array or a hash table)
 
-  function ArrayERPMasterList() {
-    this.erpNodes = [];
+  function ArrayDistMasterList() {
+    this.distNodes = [];
   }
 
-  ArrayERPMasterList.prototype.size = function() { return this.erpNodes.length; }
-      ArrayERPMasterList.prototype.oldSize = function() {
-        return this.oldErpNodes === undefined ? undefined : this.oldErpNodes.length;
+  ArrayDistMasterList.prototype.size = function() { return this.distNodes.length; }
+      ArrayDistMasterList.prototype.oldSize = function() {
+        return this.oldDistNodes === undefined ? undefined : this.oldDistNodes.length;
       }
 
-      ArrayERPMasterList.prototype.addERP = function(node) {
-        this.erpNodes.push(node);
+      ArrayDistMasterList.prototype.addDist = function(node) {
+        this.distNodes.push(node);
       };
 
-  ArrayERPMasterList.prototype.removeERP = function(node) {
+  ArrayDistMasterList.prototype.removeDist = function(node) {
     // Set it up to be removed as a post-process
     touch(node);
     node.reachable = false;
   };
 
-  ArrayERPMasterList.prototype.preProposal = function() {
-    this.oldErpNodes = this.erpNodes.slice();
+  ArrayDistMasterList.prototype.preProposal = function() {
+    this.oldDistNodes = this.distNodes.slice();
   };
 
-  ArrayERPMasterList.prototype.postProposal = function() {
-    this.erpNodes = _.filter(this.erpNodes, function(node) {
+  ArrayDistMasterList.prototype.postProposal = function() {
+    this.distNodes = _.filter(this.distNodes, function(node) {
       return node.reachable;
     });
   };
 
-  ArrayERPMasterList.prototype.getRandom = function() {
-    var idx = Math.floor(util.random() * this.erpNodes.length);
-    return this.erpNodes[idx];
+  ArrayDistMasterList.prototype.getRandom = function() {
+    var idx = Math.floor(util.random() * this.distNodes.length);
+    return this.distNodes[idx];
   };
 
-  ArrayERPMasterList.prototype.restoreOnReject = function() {
-    this.erpNodes = this.oldErpNodes;
+  ArrayDistMasterList.prototype.restoreOnReject = function() {
+    this.distNodes = this.oldDistNodes;
   };
 
 
-  function HashtableERPMasterList() {
-    this.erpNodeMap = new Hashtable();
-    this.erpsAdded = [];
-    this.erpsRemoved = [];
-    this.numErps = 0;
+  function HashtableDistMasterList() {
+    this.distNodeMap = new Hashtable();
+    this.distsAdded = [];
+    this.distsRemoved = [];
+    this.numDists = 0;
   }
 
-  HashtableERPMasterList.prototype.size = function() { return this.numErps; }
-      HashtableERPMasterList.prototype.oldSize = function() { return this.oldNumErps; }
+  HashtableDistMasterList.prototype.size = function() { return this.numDists; }
+      HashtableDistMasterList.prototype.oldSize = function() { return this.oldNumDists; }
 
-      HashtableERPMasterList.prototype.addERP = function(node) {
-        this.erpNodeMap.put(node.address, node);
-        this.erpsAdded.push(node);
-        this.numErps++;
-        // this.checkConsistency("addERP");
+      HashtableDistMasterList.prototype.addDist = function(node) {
+        this.distNodeMap.put(node.address, node);
+        this.distsAdded.push(node);
+        this.numDists++;
+        // this.checkConsistency("addDist");
       };
 
-  HashtableERPMasterList.prototype.removeERP = function(node) {
-    this.erpNodeMap.remove(node.address);
-    this.erpsRemoved.push(node);
-    this.numErps--;
-    // this.checkConsistency("removeERP");
+  HashtableDistMasterList.prototype.removeDist = function(node) {
+    this.distNodeMap.remove(node.address);
+    this.distsRemoved.push(node);
+    this.numDists--;
+    // this.checkConsistency("removeDist");
   };
 
-  HashtableERPMasterList.prototype.preProposal = function() {
-    this.oldNumErps = this.numErps;
-    this.erpsAdded = [];
-    this.erpsRemoved = [];
+  HashtableDistMasterList.prototype.preProposal = function() {
+    this.oldNumDists = this.numDists;
+    this.distsAdded = [];
+    this.distsRemoved = [];
   };
 
-  HashtableERPMasterList.prototype.postProposal = function() {};
+  HashtableDistMasterList.prototype.postProposal = function() {};
 
-  HashtableERPMasterList.prototype.getRandom = function() { return this.erpNodeMap.getRandom(); }
+  HashtableDistMasterList.prototype.getRandom = function() { return this.distNodeMap.getRandom(); }
 
-      HashtableERPMasterList.prototype.restoreOnReject = function() {
+      HashtableDistMasterList.prototype.restoreOnReject = function() {
         // this.checkConsistency("restoreOnReject");
-        this.numErps = this.oldNumErps;
-        var n = this.erpsAdded.length;
+        this.numDists = this.oldNumDists;
+        var n = this.distsAdded.length;
         while (n--) {
-          var node = this.erpsAdded[n];
-          this.erpNodeMap.remove(node.address);
+          var node = this.distsAdded[n];
+          this.distNodeMap.remove(node.address);
         }
-        n = this.erpsRemoved.length;
+        n = this.distsRemoved.length;
         while (n--) {
-          var node = this.erpsRemoved[n];
-          this.erpNodeMap.put(node.address, node);
+          var node = this.distsRemoved[n];
+          this.distNodeMap.put(node.address, node);
         }
       };
 
   // For debugging
-  HashtableERPMasterList.prototype.checkConsistency = function(tag) {
-    for (var i = 0; i < this.erpsAdded.length; i++) {
-      var addr = this.erpsAdded[i].address;
-      if (!this.erpNodeMap.get(addr))
+  HashtableDistMasterList.prototype.checkConsistency = function(tag) {
+    for (var i = 0; i < this.distsAdded.length; i++) {
+      var addr = this.distsAdded[i].address;
+      if (!this.distNodeMap.get(addr))
         throw "WTF - hash table doesn't contain node " + addr + ' that we added (' + tag + ')';
     }
-    for (var i = 0; i < this.erpsRemoved.length; i++) {
-      var addr = this.erpsRemoved[i].address;
-      if (this.erpNodeMap.get(addr))
+    for (var i = 0; i < this.distsRemoved.length; i++) {
+      var addr = this.distsRemoved[i].address;
+      if (this.distNodeMap.get(addr))
         throw 'WTF - hash table contains node ' + addr + ' that we removed (' + tag + ')';
     }
   };
@@ -60074,8 +60570,10 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  function IncrementalMH(s, k, a, wpplFn, numIterations, opts) {
+  function IncrementalMH(s, k, a, wpplFn, opts) {
+    util.throwUnlessOpts(opts, 'IncrementalMH');
     // Extract options
+    var numSamples = opts.samples === undefined ? 1 : opts.samples;
     var dontAdapt = opts.dontAdapt === undefined ? false : opts.dontAdapt;
     var debuglevel = opts.debuglevel === undefined ? 0 : opts.debuglevel;
     var verbose = opts.verbose === undefined ? false : opts.verbose;
@@ -60099,16 +60597,16 @@ module.exports = function(env) {
 
     this.k = k;
     this.oldStore = s;
-    this.iterations = numIterations;
+    this.iterations = numSamples * (lag + 1) + burn;
     this.wpplFn = wpplFn;
     this.s = s;
     this.a = a;
 
     this.aggregator = (justSample || onlyMAP) ?
-        new MAP(justSample) :
-        new Histogram();
+        new MaxAggregator(justSample) :
+        new CountAggregator();
 
-    this.totalIterations = numIterations;
+    this.totalIterations = this.iterations;
     this.acceptedProps = 0;
     this.lag = lag;
     this.burn = burn;
@@ -60127,8 +60625,8 @@ module.exports = function(env) {
 
   IncrementalMH.prototype.run = function() {
     this.cacheRoot = null;
-    this.erpMasterList = new HashtableERPMasterList();
-    // this.erpMasterList = new ArrayERPMasterList();
+    this.distMasterList = new HashtableDistMasterList();
+    // this.distMasterList = new ArrayDistMasterList();
     this.touchedNodes = [];
     this.score = 0;
     this.fwdPropLP = 0;
@@ -60151,8 +60649,8 @@ module.exports = function(env) {
     return this.cachelookup(FactorNode, s, k, a, null, [score]).execute();
   };
 
-  IncrementalMH.prototype.sample = function(s, k, a, erp, params, name) {
-    var n = this.cachelookup(ERPNode, s, k, a, erp, params);
+  IncrementalMH.prototype.sample = function(s, k, a, dist, name) {
+    var n = this.cachelookup(DistNode, s, k, a, dist);
     n.name = name;
     return n.execute();
   };
@@ -60200,23 +60698,23 @@ module.exports = function(env) {
         // Continue proposing as normal
         this.iterations--;
 
-        this.erpMasterList.postProposal();
+        this.distMasterList.postProposal();
 
-        debuglog(2, 'Num vars:', this.erpMasterList.size());
+        debuglog(2, 'Num vars:', this.distMasterList.size());
         debuglog(2, 'Touched nodes:', this.touchedNodes.length);
 
         // Accept/reject the current proposal
         var acceptance = acceptProb(this.score, this.oldScore,
-                                    this.erpMasterList.size(), this.erpMasterList.oldSize(),
+                                    this.distMasterList.size(), this.distMasterList.oldSize(),
                                     this.rvsPropLP, this.fwdPropLP);
-        debuglog(1, 'num vars:', this.erpMasterList.size(), 'old num vars:', this.erpMasterList.oldSize());
+        debuglog(1, 'num vars:', this.distMasterList.size(), 'old num vars:', this.distMasterList.oldSize());
         debuglog(1, 'acceptance prob:', acceptance);
         if (util.random() >= acceptance) {
           debuglog(1, 'REJECT');
           this.score = this.oldScore;
           var n = this.touchedNodes.length;
           while (n--) restoreSnapshot(this.touchedNodes[n]);
-          this.erpMasterList.restoreOnReject();
+          this.distMasterList.restoreOnReject();
         }
         else {
           debuglog(1, 'ACCEPT');
@@ -60231,7 +60729,7 @@ module.exports = function(env) {
         debuglog(1, 'return val:', val);
 
         // Record this sample, if lag allows for it and not in burnin period
-        if ((iternum % (this.lag + 1) === 0) && (iternum > this.burn)) {
+        if ((iternum % (this.lag + 1) === 0) && (iternum >= this.burn)) {
           // Replace val with accumulated query, if need be.
           if (val === env.query)
             val = this.query.getTable();
@@ -60249,18 +60747,18 @@ module.exports = function(env) {
         if (this.doAdapt)
           this.cacheAdapter.adapt(this.cacheRoot);
 
-        if (this.erpMasterList.numErps > 0) {
+        if (this.distMasterList.numDists > 0) {
           // Prepare to make a new proposal
           this.oldScore = this.score;
-          this.erpMasterList.preProposal();
+          this.distMasterList.preProposal();
           this.touchedNodes = [];
           this.fwdPropLP = 0;
           this.rvsPropLP = 0;
-          // Select ERP to change.
-          var propnode = this.erpMasterList.getRandom();
+          // Select distribution to change.
+          var propnode = this.distMasterList.getRandom();
           // Propose change and resume execution
           debuglog(1, '----------------------------------------------------------------------');
-          debuglog(1, 'PROPOSAL', 'type:', propnode.erp.sample.name, 'address:', propnode.address);
+          debuglog(1, 'PROPOSAL', 'type:', propnode.dist, 'address:', propnode.address);
           return propnode.propose();
         } else {
           return this.runFromStart();
@@ -60277,7 +60775,7 @@ module.exports = function(env) {
       }
 
       // Return by calling original continuation:
-      return k(this.oldStore, this.aggregator.toERP());
+      return k(this.oldStore, this.aggregator.toDist());
     }
   };
 
@@ -60360,15 +60858,15 @@ module.exports = function(env) {
     }
   };
 
-  IncrementalMH.prototype.addERP = function(node) {
-    tabbedlog(3, node.depth, 'new ERP');
-    this.erpMasterList.addERP(node);
+  IncrementalMH.prototype.addDist = function(node) {
+    tabbedlog(3, node.depth, 'new distribution');
+    this.distMasterList.addDist(node);
     this.fwdPropLP += node.score;
   };
 
-  IncrementalMH.prototype.removeERP = function(node) {
-    tabbedlog(3, node.depth, 'kill ERP', node.address);
-    this.erpMasterList.removeERP(node);
+  IncrementalMH.prototype.removeDist = function(node) {
+    tabbedlog(3, node.depth, 'kill distribution', node.address);
+    this.distMasterList.removeDist(node);
     this.rvsPropLP += node.score;
     this.score -= node.score;
   };
@@ -60412,9 +60910,9 @@ module.exports = function(env) {
 
   // ------------------------------------------------------------------
 
-  function imh(s, cc, a, wpplFn, numIters, opts) {
+  function imh(s, cc, a, wpplFn, opts) {
     opts = opts || {};
-    return new IncrementalMH(s, cc, a, wpplFn, numIters, opts).run();
+    return new IncrementalMH(s, cc, a, wpplFn, opts).run();
   }
 
   return {
@@ -60424,7 +60922,7 @@ module.exports = function(env) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../aggregation/histogram":154,"../aggregation/map":155,"../hashtable":163,"../query":179,"../util":190,"assert":192,"underscore":151}],170:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../aggregation/MaxAggregator":154,"../hashtable":163,"../query":179,"../util":190,"assert":192,"underscore":151}],170:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
@@ -60458,10 +60956,10 @@ module.exports = function(env) {
     return this.trace.continue();
   };
 
-  Initialize.prototype.sample = function(s, k, a, erp, params) {
-    var _val = erp.sample(ad.valueRec(params));
-    var val = this.ad && erp.isContinuous ? ad.lift(_val) : _val;
-    this.trace.addChoice(erp, params, val, a, s, k);
+  Initialize.prototype.sample = function(s, k, a, dist) {
+    var _val = dist.sample();
+    var val = this.ad && dist.isContinuous ? ad.lift(_val) : _val;
+    this.trace.addChoice(dist, val, a, s, k);
     return k(s, val);
   };
 
@@ -60607,8 +61105,9 @@ module.exports = function(env) {
 
 var _ = require('underscore');
 var util = require('../util');
-var Histogram = require('../aggregation/histogram');
-var MAP = require('../aggregation/map');
+var CountAggregator = require('../aggregation/CountAggregator');
+var MaxAggregator = require('../aggregation/MaxAggregator');
+var ad = require('../ad');
 
 module.exports = function(env) {
 
@@ -60616,6 +61115,7 @@ module.exports = function(env) {
   var kernels = require('./kernels')(env);
 
   function MCMC(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'MCMC');
     var options = util.mergeDefaults(options, {
       samples: 100,
       kernel: 'MH',
@@ -60632,8 +61132,12 @@ module.exports = function(env) {
     _.invoke(callbacks, 'setup', numIters(options));
 
     var aggregator = (options.justSample || options.onlyMAP) ?
-        new MAP(options.justSample) :
-        new Histogram();
+        new MaxAggregator(options.justSample) :
+        new CountAggregator();
+
+    var addToAggregator = options.kernel.adRequired ?
+        function(value, score) { aggregator.add(ad.valueRec(value), ad.value(score)); } :
+        aggregator.add.bind(aggregator);
 
     var initialize, run, finish;
 
@@ -60645,7 +61149,7 @@ module.exports = function(env) {
     run = function(initialTrace) {
       initialTrace.info = { accepted: 0, total: 0 };
       var callback = kernels.tap(function(trace) { _.invoke(callbacks, 'iteration', trace); });
-      var collectSample = makeExtractValue(aggregator.add.bind(aggregator));
+      var collectSample = makeExtractValue(addToAggregator);
       var kernel = kernels.sequence(options.kernel, callback);
       var chain = kernels.sequence(
           kernels.repeat(options.burn, kernel),
@@ -60658,7 +61162,7 @@ module.exports = function(env) {
 
     finish = function(trace) {
       _.invoke(callbacks, 'finish', trace);
-      return k(s, aggregator.toERP());
+      return k(s, aggregator.toDist());
     };
 
     return initialize();
@@ -60727,12 +61231,11 @@ module.exports = function(env) {
 };
 
 }).call(this,require('_process'))
-},{"../aggregation/histogram":154,"../aggregation/map":155,"../util":190,"./initialize":170,"./kernels":171,"_process":389,"underscore":151}],173:[function(require,module,exports){
+},{"../ad":152,"../aggregation/CountAggregator":153,"../aggregation/MaxAggregator":154,"../util":190,"./initialize":170,"./kernels":171,"_process":389,"underscore":151}],173:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
 var assert = require('assert');
-var erp = require('../erp');
 var util = require('../util');
 var ad = require('../ad');
 
@@ -60772,7 +61275,7 @@ module.exports = function(env) {
     env.query.clear();
     this.trace = this.oldTrace.upto(this.regenFrom);
     var regen = this.oldTrace.choiceAtIndex(this.regenFrom);
-    return this.sample(_.clone(regen.store), regen.k, regen.address, regen.erp, regen.params, true);
+    return this.sample(_.clone(regen.store), regen.k, regen.address, regen.dist, true);
   };
 
   MHKernel.prototype.factor = function(s, k, a, score) {
@@ -60789,18 +61292,17 @@ module.exports = function(env) {
     return k(s);
   };
 
-  MHKernel.prototype.sample = function(s, k, a, erp, params, forceSample) {
+  MHKernel.prototype.sample = function(s, k, a, dist, forceSample) {
     var _val, val;
     var prevChoice = this.oldTrace.findChoice(a);
 
     if (forceSample) {
       assert(prevChoice);
-      var proposalErp = erp.proposer || erp;
-      var proposalParams = erp.proposer ? [params, prevChoice.val] : params;
-      _val = proposalErp.sample(ad.valueRec(proposalParams));
-      val = this.adRequired && proposalErp.isContinuous ? ad.lift(_val) : _val;
+      var proposalDist = dist.driftKernel ? dist.driftKernel(prevChoice.val) : dist;
+      _val = proposalDist.sample();
+      val = this.adRequired && proposalDist.isContinuous ? ad.lift(_val) : _val;
       // Optimization: Bail early if same value is re-sampled.
-      if (!proposalErp.isContinuous && prevChoice.val === val) {
+      if (!proposalDist.isContinuous && prevChoice.val === val) {
         return this.finish(this.oldTrace, true);
       }
     } else {
@@ -60808,12 +61310,12 @@ module.exports = function(env) {
         val = prevChoice.val; // Will be a tape if continuous.
         this.reused[a] = true;
       } else {
-        _val = erp.sample(ad.valueRec(params));
-        val = this.adRequired && erp.isContinuous ? ad.lift(_val) : _val;
+        _val = dist.sample();
+        val = this.adRequired && dist.isContinuous ? ad.lift(_val) : _val;
       }
     }
 
-    this.trace.addChoice(erp, params, val, a, s, k);
+    this.trace.addChoice(dist, val, a, s, k);
     if (ad.value(this.trace.score) === -Infinity) {
       return this.finish(this.oldTrace, false);
     }
@@ -60851,15 +61353,15 @@ module.exports = function(env) {
 
   MHKernel.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  MHKernel.prototype.proposableDiscreteErpIndices = function(trace) {
+  MHKernel.prototype.proposableDiscreteDistIndices = function(trace) {
     return _.range(this.proposalBoundary, trace.length).filter(function(i) {
-      return !trace.choices[i].erp.isContinuous;
+      return !trace.choices[i].dist.isContinuous;
     });
   };
 
   MHKernel.prototype.numRegenChoices = function(trace) {
     if (this.discreteOnly) {
-      return this.proposableDiscreteErpIndices(trace).length;
+      return this.proposableDiscreteDistIndices(trace).length;
     } else {
       return trace.length - this.proposalBoundary;
     }
@@ -60872,7 +61374,7 @@ module.exports = function(env) {
   };
 
   MHKernel.prototype.sampleRegenChoiceDiscrete = function(trace) {
-    var indices = this.proposableDiscreteErpIndices(trace);
+    var indices = this.proposableDiscreteDistIndices(trace);
     return indices.length > 0 ? indices[Math.floor(util.random() * indices.length)] : -1;
   };
 
@@ -60897,23 +61399,21 @@ module.exports = function(env) {
   };
 
   MHKernel.prototype.transitionProb = function(fromTrace, toTrace) {
-    // Proposed to ERP.
-    var proposalErp, proposalParams;
+    // Proposed to distribution.
+    var proposalDist;
     var regenChoice = toTrace.choiceAtIndex(this.regenFrom);
 
-    if (regenChoice.erp.proposer) {
-      proposalErp = regenChoice.erp.proposer;
-      proposalParams = [regenChoice.params, fromTrace.choiceAtIndex(this.regenFrom).val];
+    if (regenChoice.dist.driftKernel) {
+      proposalDist = regenChoice.dist.driftKernel(fromTrace.choiceAtIndex(this.regenFrom).val);
     } else {
-      proposalErp = regenChoice.erp;
-      proposalParams = regenChoice.params;
+      proposalDist = regenChoice.dist;
     }
 
-    var score = ad.value(proposalErp.score(proposalParams, regenChoice.val));
+    var score = ad.value(proposalDist.score(regenChoice.val));
 
     // Rest of the trace.
     score += util.sum(toTrace.choices.slice(this.regenFrom + 1).map(function(choice) {
-      return this.reused.hasOwnProperty(choice.address) ? 0 : ad.value(choice.erp.score(choice.params, choice.val));
+      return this.reused.hasOwnProperty(choice.address) ? 0 : ad.value(choice.dist.score(choice.val));
     }, this));
 
     score -= Math.log(this.numRegenChoices(fromTrace));
@@ -60927,16 +61427,16 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../erp":162,"../util":190,"assert":192,"underscore":151}],174:[function(require,module,exports){
+},{"../ad":152,"../util":190,"assert":192,"underscore":151}],174:[function(require,module,exports){
 ////////////////////////////////////////////////////////////////////
 // PMCMC
 
 'use strict';
 
 var _ = require('underscore');
-var erp = require('../erp');
+var dists = require('../dists');
 var util = require('../util')
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 
 module.exports = function(env) {
 
@@ -60944,8 +61444,9 @@ module.exports = function(env) {
     return xs[xs.length - 1];
   }
 
-  function PMCMC(s, cc, a, wpplFn, numParticles, numSweeps) {
 
+  function PMCMC(s, cc, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'PMCMC');
     // Move old coroutine out of the way and install this as the
     // current handler.
     this.oldCoroutine = env.coroutine;
@@ -60959,13 +61460,13 @@ module.exports = function(env) {
     // Setup inference variables
     this.particleIndex = 0;  // marks the active particle
     this.retainedParticle = undefined;
-    this.numSweeps = numSweeps;
+    this.numSweeps = options.sweeps;
     this.sweep = 0;
     this.wpplFn = wpplFn;
     this.address = a;
-    this.numParticles = numParticles;
+    this.numParticles = options.particles;
     this.resetParticles();
-    this.hist = new Histogram();
+    this.hist = new CountAggregator();
   }
 
   PMCMC.prototype.run = function() {
@@ -61011,8 +61512,8 @@ module.exports = function(env) {
     return ((this.particleIndex + 1) === this.particles.length);
   };
 
-  PMCMC.prototype.sample = function(s, cc, a, erp, params) {
-    return cc(s, erp.sample(params));
+  PMCMC.prototype.sample = function(s, cc, a, dist) {
+    return cc(s, dist.sample());
   };
 
   PMCMC.prototype.particleAtStep = function(particle, step) {
@@ -61050,7 +61551,7 @@ module.exports = function(env) {
     var j;
     var newParticles = [];
     for (var i = 0; i < particles.length; i++) {
-      j = erp.discreteSample(weights);
+      j = dists.discreteSample(weights);
       newParticles.push(this.copyParticle(particles[j]));
     }
 
@@ -61119,7 +61620,7 @@ module.exports = function(env) {
         env.coroutine = this.oldCoroutine;
 
         // Return from particle filter by calling original continuation:
-        return this.k(this.oldStore, this.hist.toERP());
+        return this.k(this.oldStore, this.hist.toDist());
 
       }
     }
@@ -61127,8 +61628,8 @@ module.exports = function(env) {
 
   PMCMC.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  function pmc(s, cc, a, wpplFn, numParticles, numSweeps) {
-    return new PMCMC(s, cc, a, wpplFn, numParticles, numSweeps).run();
+  function pmc(s, cc, a, wpplFn, options) {
+    return new PMCMC(s, cc, a, wpplFn, options).run();
   }
 
   return {
@@ -61137,7 +61638,7 @@ module.exports = function(env) {
 
 };
 
-},{"../aggregation/histogram":154,"../erp":162,"../util":190,"underscore":151}],175:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../dists":162,"../util":190,"underscore":151}],175:[function(require,module,exports){
 // Rejection sampling
 //
 // maxScore: An upper bound on the total factor score per-execution.
@@ -61149,27 +61650,32 @@ module.exports = function(env) {
 'use strict';
 
 var _ = require('underscore');
-var erp = require('../erp');
 var assert = require('assert');
 var util = require('../util');
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 
 module.exports = function(env) {
 
-  function Rejection(s, k, a, wpplFn, numSamples, maxScore, incremental) {
+  function Rejection(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'Rejection');
+    options = util.mergeDefaults(options, {
+      samples: 1,
+      maxScore: 0,
+      incremental: false
+    });
+    this.numSamples = options.samples;
+    this.maxScore = options.maxScore;
+    this.incremental = options.incremental;
     this.s = s;
     this.k = k;
     this.a = a;
     this.wpplFn = wpplFn;
-    this.maxScore = (maxScore === undefined) ? 0 : maxScore;
-    this.incremental = incremental;
-    this.hist = new Histogram();
-    this.numSamples = (numSamples === undefined) ? 1 : numSamples;
+    this.hist = new CountAggregator();
     this.oldCoroutine = env.coroutine;
     env.coroutine = this;
 
-    if (!_.isNumber(numSamples) || numSamples <= 0) {
-      throw 'numSamples should be a positive integer.';
+    if (!_.isNumber(this.numSamples) || this.numSamples <= 0) {
+      throw 'samples should be a positive integer.';
     }
 
     if (this.incremental) {
@@ -61183,8 +61689,8 @@ module.exports = function(env) {
     return this.wpplFn(_.clone(this.s), env.exit, this.a);
   };
 
-  Rejection.prototype.sample = function(s, k, a, erp, params) {
-    return k(s, erp.sample(params));
+  Rejection.prototype.sample = function(s, k, a, dist) {
+    return k(s, dist.sample());
   };
 
   Rejection.prototype.factor = function(s, k, a, score) {
@@ -61215,7 +61721,7 @@ module.exports = function(env) {
 
     if (this.numSamples === 0) {
       env.coroutine = this.oldCoroutine;
-      return this.k(this.s, this.hist.toERP());
+      return this.k(this.s, this.hist.toDist());
     } else {
       return this.run();
     }
@@ -61223,8 +61729,8 @@ module.exports = function(env) {
 
   Rejection.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  function rej(s, k, a, wpplFn, numSamples, maxScore, incremental) {
-    return new Rejection(s, k, a, wpplFn, numSamples, maxScore, incremental).run();
+  function rej(s, k, a, wpplFn, options) {
+    return new Rejection(s, k, a, wpplFn, options).run();
   }
 
   return {
@@ -61233,16 +61739,16 @@ module.exports = function(env) {
 
 };
 
-},{"../aggregation/histogram":154,"../erp":162,"../util":190,"assert":192,"underscore":151}],176:[function(require,module,exports){
+},{"../aggregation/CountAggregator":153,"../util":190,"assert":192,"underscore":151}],176:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
 var util = require('../util');
-var erp = require('../erp');
+var dists = require('../dists');
 var Trace = require('../trace');
 
 var assert = require('assert');
-var Histogram = require('../aggregation/histogram');
+var CountAggregator = require('../aggregation/CountAggregator');
 var ad = require('../ad');
 
 module.exports = function(env) {
@@ -61250,6 +61756,7 @@ module.exports = function(env) {
   var kernels = require('./kernels')(env);
 
   function SMC(s, k, a, wpplFn, options) {
+    util.throwUnlessOpts(options, 'SMC');
     var options = util.mergeDefaults(options, {
       particles: 100,
       rejuvSteps: 0,
@@ -61260,8 +61767,8 @@ module.exports = function(env) {
     this.rejuvKernel = kernels.parseOptions(options.rejuvKernel);
     this.rejuvSteps = options.rejuvSteps;
 
-    this.adRequired = this.rejuvKernel.adRequired;
     this.performRejuv = this.rejuvSteps > 0;
+    this.adRequired = this.performRejuv && this.rejuvKernel.adRequired;
     this.performFinalRejuv = this.performRejuv && options.finalRejuv;
     this.numParticles = options.particles;
     this.debug = options.debug;
@@ -61288,19 +61795,18 @@ module.exports = function(env) {
     return this.runCurrentParticle();
   };
 
-  SMC.prototype.sample = function(s, k, a, erp, params) {
-    var importanceERP = erp.importanceERP || erp;
-    var _params = ad.valueRec(params);
-    var _val = importanceERP.sample(_params);
-    var val = this.adRequired && importanceERP.isContinuous ? ad.lift(_val) : _val;
-    var importanceScore = importanceERP.score(_params, _val);
-    var choiceScore = erp.score(_params, _val);
+  SMC.prototype.sample = function(s, k, a, dist) {
+    var importanceDist = dist.importanceDist || dist;
+    var _val = importanceDist.sample();
+    var val = this.adRequired && importanceDist.isContinuous ? ad.lift(_val) : _val;
+    var importanceScore = importanceDist.score(_val);
+    var choiceScore = dist.score(_val);
     var particle = this.currentParticle();
     // Optimization: Choices are not required for PF without rejuvenation.
     if (this.performRejuv) {
-      particle.trace.addChoice(erp, params, val, a, s, k);
+      particle.trace.addChoice(dist, val, a, s, k);
     }
-    particle.logWeight += choiceScore - importanceScore;
+    particle.logWeight += ad.value(choiceScore) - ad.value(importanceScore);
     return k(s, val);
   };
 
@@ -61368,7 +61874,7 @@ module.exports = function(env) {
     var newParticles = [];
     var j;
     for (var i = 0; i < numNewParticles; i++) {
-      j = erp.discreteSample(newWeights);
+      j = dists.discreteSample(newWeights);
       newParticles.push(particles[j].copy());
     }
 
@@ -61493,7 +61999,10 @@ module.exports = function(env) {
   SMC.prototype.finish = function(s, val) {
     assert.strictEqual(this.completeParticles.length, this.numParticles);
 
-    var hist = new Histogram();
+    var hist = new CountAggregator();
+    var addToHist = this.adRequired ?
+        function(value) { hist.add(ad.valueRec(value)); } :
+        hist.add.bind(hist);
     var logAvgW = _.first(this.completeParticles).logWeight;
 
     return util.cpsForEach(
@@ -61504,15 +62013,15 @@ module.exports = function(env) {
                 this.rejuvSteps,
                 kernels.sequence(
                     this.rejuvKernel,
-                    kernels.tap(function(trace) { hist.add(trace.value); })));
+                    kernels.tap(function(trace) { addToHist(trace.value); })));
             return chain(k, particle.trace);
           } else {
-            hist.add(particle.trace.value);
+            addToHist(particle.trace.value);
             return k();
           }
         }.bind(this),
         function() {
-          var dist = hist.toERP();
+          var dist = hist.toDist();
           dist.normalizationConstant = logAvgW;
           env.coroutine = this.coroutine;
           return this.k(this.s, dist);
@@ -61522,7 +62031,7 @@ module.exports = function(env) {
 
   SMC.prototype.incrementalize = env.defaultCoroutine.incrementalize;
 
-  // Restrict rejuvenation to erps that come after proposal boundary.
+  // Restrict rejuvenation to choices that come after proposal boundary.
   function setProposalBoundary(s, k, a) {
     if (env.coroutine.currentParticle) {
       var particle = env.coroutine.currentParticle();
@@ -61553,17 +62062,14 @@ module.exports = function(env) {
 
 };
 
-},{"../ad":152,"../aggregation/histogram":154,"../erp":162,"../trace":181,"../util":190,"./kernels":171,"assert":192,"underscore":151}],177:[function(require,module,exports){
+},{"../ad":152,"../aggregation/CountAggregator":153,"../dists":162,"../trace":181,"../util":190,"./kernels":171,"assert":192,"underscore":151}],177:[function(require,module,exports){
 ////////////////////////////////////////////////////////////////////
 // Simple Variational inference wrt the (pseudo)mean-field program.
-// We do stochastic gradient descent on the ERP params.
+// We do stochastic gradient descent on the dist params.
 // On sample statements: sample and accumulate grad-log-score, orig-score, and variational-score
 // On factor statements accumulate into orig-score.
 
 'use strict';
-
-var erp = require('../erp');
-
 
 module.exports = function(env) {
 
@@ -61607,7 +62113,7 @@ module.exports = function(env) {
     this.wpplFn(this.initialStore, env.exit, this.initialAddress);
   };
 
-  Variational.prototype.sample = function(s, k, a, erp, params) {
+  Variational.prototype.sample = function(s, k, a, dist, params) {
     //sample from variational dist
     if (!this.variationalParams.hasOwnProperty(a)) {
       //initialize at prior (for this sample)...
@@ -61615,14 +62121,14 @@ module.exports = function(env) {
       this.runningG2[a] = [0];//fixme: vec size
     }
     var vParams = this.variationalParams[a];
-    var val = erp.sample(vParams);
+    var val = dist.sample(vParams);
 
     //compute variational dist grad
-    this.samplegrad[a] = erp.grad(vParams, val);
+    this.samplegrad[a] = dist.grad(vParams, val);
 
     //compute target score + variational score
-    this.jointScore += erp.score(params, val);
-    this.variScore += erp.score(vParams, val);
+    this.jointScore += dist.score(params, val);
+    this.variScore += dist.score(vParams, val);
 
     k(s, val); //TODO: need a?
   };
@@ -61678,7 +62184,7 @@ module.exports = function(env) {
       return this.takeGradSample();
     }
 
-    //return variational dist as ERP:
+    //return variational dist:
     //FIXME
     console.log(this.variationalParams);
     var dist = null;
@@ -61718,7 +62224,7 @@ module.exports = function(env) {
 
 };
 
-},{"../erp":162}],178:[function(require,module,exports){
+},{}],178:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -61792,8 +62298,8 @@ function loadMacros(pkg) {
 
 function headerPackage() {
   // Create a pseudo package from the header.
-  var code = "'no caching';\n\n// ERPs\n\nvar flip = function(theta) {\n  var theta = (theta !== undefined) ? theta : 0.5;\n  return sample(bernoulliERP, [theta]);\n};\n\nvar randomInteger = function(n) {\n  return sample(randomIntegerERP, [n]);\n};\n\nvar discrete = function(ps) {\n  return sample(discreteERP, [ps]);\n};\n\nvar categorical = function(ps, vs) {\n  return vs[discrete(ps)];\n};\n\nvar multinomial = function(ps, n) {\n  return sample(multinomialERP, [ps, n]);\n};\n\nvar gaussian = function(mu, sigma) {\n  return sample(gaussianERP, [mu, sigma]);\n};\n\nvar multivariateGaussian = function(mu, cov) {\n  return sample(multivariateGaussianERP, [mu, cov]);\n};\n\nvar cauchy = function(location, scale) {\n  return sample(cauchyERP, [location, scale]);\n};\n\nvar uniform = function(a, b) {\n  return sample(uniformERP, [a, b]);\n};\n\nvar uniformDraw = function(l) {\n  return l[sample(randomIntegerERP, [l.length])];\n};\n\nvar dirichlet = function(alpha) {\n  return sample(dirichletERP, alpha);\n};\n\nvar poisson = function(mu) {\n  return sample(poissonERP, [mu]);\n};\n\nvar binomial = function(p, n) {\n  return sample(binomialERP, [p, n]);\n};\n\nvar beta = function(a, b) {\n  return sample(betaERP, [a, b]);\n};\n\nvar exponential = function(a) {\n  return sample(exponentialERP, [a]);\n};\n\nvar gamma = function(shape, scale) {\n  return sample(gammaERP, [shape, scale]);\n};\n\nvar deltaERP = function(v) {\n  return _top.makeCategoricalERP([1.0], [v]);\n};\n\nvar categoricalERP = function(ps, vs, extraParams) {\n  return _top.makeCategoricalERP(ps, vs, extraParams);\n};\n\nvar multiplexERP = function(vs, erps) {\n  return _top.makeMultiplexERP(vs, erps);\n};\n\nvar serializeERP = function(erp) {\n  return _top.serializeERP(erp);\n};\n\nvar deserializeERP = function(JSONString) {\n  return _top.deserializeERP(JSONString);\n};\n\n// XRPs\n\nvar makeBetaBernoulli = function(pseudocounts) {\n  globalStore.BBindex = 1 + (globalStore.BBindex || 0);\n  var bbname = 'BB' + globalStore.BBindex;\n  globalStore[bbname] = pseudocounts;\n  return function() {\n    var pc = globalStore[bbname];  // get current sufficient stats\n    var val = sample(bernoulliERP, [pc[0] / (pc[0] + pc[1])]);  // sample from predictive.\n    globalStore[bbname] = [pc[0] + val, pc[1] + !val];  // update sufficient stats\n    return val;\n  };\n};\n\nvar makeDirichletDiscrete = function(pseudocounts) {\n  var addCount = function(a, i, j) {\n    var j = j || 0;\n    if (a.length === 0) {\n      return [];\n    } else {\n      return [a[0] + (i === j)].concat(addCount(a.slice(1), i, j + 1));\n    }\n  };\n  globalStore.DDindex = 1 + (globalStore.DDindex || 0);\n  var ddname = 'DD' + globalStore.DDindex;\n  globalStore[ddname] = pseudocounts;\n  return function() {\n    var pc = globalStore[ddname];  // get current sufficient stats\n    var val = sample(discreteERP, [pc]);  // sample from predictive. (doesn't need to be normalized.)\n    globalStore[ddname] = addCount(pc, val); // update sufficient stats\n    return val;\n  };\n};\n\n// Arithmetic and other functionals\n\nvar plus = function(a, b) {\n  return a + b;\n};\nvar minus = function(a, b) {\n  return a - b;\n};\nvar mult = function(a, b) {\n  return a * b;\n};\nvar div = function(a, b) {\n  return a / b;\n};\n\nvar and = function(a, b) {\n  return a && b\n}\nvar or = function(a, b) {\n  return a || b\n}\n\nvar eq = function(a, b) {\n  return a === b;\n};\nvar neq = function(a, b) {\n  return a != b;\n};\nvar lt = function(a, b) {\n  return a < b;\n};\nvar gt = function(a, b) {\n  return a > b;\n};\nvar leq = function(a, b) {\n  return a <= b;\n};\nvar geq = function(a, b) {\n  return a >= b;\n};\n\nvar isEven = function(v) {\n  return v % 2 === 0;\n};\nvar isOdd = function(v) {\n  return v % 2 != 0;\n};\n\nvar idF = function(x) {\n  return x;\n};\nvar constF = function(f) {\n  return function() {\n    return f;\n  };\n};\nvar falseF = function() {\n  return false;\n};\nvar trueF = function() {\n  return true;\n};\n\n// Probability computations & calculations\n\nvar MAP = function(erp) {\n  return erp.MAP();\n};\n\nvar expectation = function(erp, func) {\n  var f = func || idF;\n  var supp = erp.support([]);\n  return mapReduce1(plus,\n                    function(s) {\n                      return Math.exp(erp.score([], s)) * f(s);\n                    },\n                    supp);\n};\n\nvar entropy = function(erp) {\n  return erp.entropy();\n};\n\n// Data structures & higher-order functions\n\nvar append = function(a, b) {\n  return a.concat(b);\n};\nvar cons = function(a, b) {\n  return [a].concat(b);\n};\nvar snoc = function(a, b) {\n  return a.concat([b]);\n};\n\nvar first = function(xs) {\n  return xs[0];\n};\nvar second = function(xs) {\n  return xs[1];\n};\nvar third = function(xs) {\n  return xs[2];\n};\nvar fourth = function(xs) {\n  return xs[3];\n};\nvar secondLast = function(xs) {\n  return xs[xs.length - 2];\n};\nvar last = function(xs) {\n  return xs[xs.length - 1];\n};\n\nvar most = function(xs) {\n  return xs.slice(0, xs.length - 1);\n}\n\nvar rest = function(xs) {\n  return xs.slice(1);\n};\n\nvar map_helper = function(i, j, f) {\n  var n = j - i + 1;\n  if (n == 0) {\n    return []\n  } else if (n == 1) {\n    return [f(i)];\n  } else {\n    var n1 = Math.ceil(n / 2);\n    return map_helper(i, i + n1 - 1, f).concat(map_helper(i + n1, j, f));\n  }\n}\n\n// recursively split input array so that we only call\n// concat a logarithmic number of times\nvar map = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(l[i]) })\n}\n\n// assumes that length l1 == length l2\nvar map2 = function(fn, l1, l2) {\n  return map_helper(0, l1.length - 1, function(i) { return fn(l1[i], l2[i]) })\n}\n\n// sugar for map(f, [0,1,...,n-1])\nvar mapN = function(fn, n) {\n  return map_helper(0, n - 1, function(i) { return fn(i) })\n}\n\nvar mapIndexed = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(i, l[i]) })\n}\n\nvar _ringAround = function(l, n) {\n  return l.slice(n).concat(l.slice(0, n));\n};\n\nvar ringForward = function(l, n) {\n  return _ringAround(l, n === undefined ? -1 : -n);\n};\n\nvar ringBackward = function(l, n) {\n  return _ringAround(l, n === undefined ? 1 : n);\n};\n\n// map through the cartesian product l1 * l2\nvar mapPairs2 = function(f, l1, l2) {\n  var res = map(function(a) {\n    return map(function(b) {\n      return f(a, b);\n    }, l2)\n  }, l1);\n  return [].concat.apply([], res); // flatten\n};\n\n// map through all 2-combinations of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], and ['b','c']\nvar mapPairsC = function(f, l) {\n  var n = l.length;\n\n  var helper = function(i) {\n    if (i === n) {\n      return [];\n    } else {\n      // compute {f(i,j)} where j \\in {i+1,...,n}\n      var r = mapN(\n          function(k) {\n            var j = i + k + 1;\n            return f(l[i], l[j])\n          },\n          n - (i + 1));\n\n      return append(r, helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// map through all 2-tuples of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], ['b','a'], ['b','c'], ['c','a'], ['c','b']\nvar mapPairsNC = function(f, l) {\n  var res = mapPairs2(function(a, b) {\n    return a === b ? undefined : f(a, b);\n  }, l, l);\n  return remove(undefined, res);\n};\n\nvar mapObject = function(fn, obj) {\n  return _.object(\n      map(\n      function(kv) {\n        return [kv[0], fn(kv[0], kv[1])]\n      },\n      _.pairs(obj))\n  );\n};\n\nvar reduce = function(fn, init, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return init\n    } else {\n      return fn(ar[i], helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// sugar for reduce(f, g(init), map(g,ar))\nvar mapReduce = function(f, init, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(init),\n                ar);\n};\n\n// sugar for reduce(f, g(last(ar)), map(g, butLast(ar)))\nvar mapReduce1 = function(f, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(ar[ar.length - 1]),\n                ar.slice(0, -1));\n};\n\nvar sum = function(l) {\n  return reduce(plus, 0, l);\n};\nvar product = function(l) {\n  return reduce(mult, 1, l);\n};\n\nvar listMean = function(l) {\n  return reduce(plus, 0, l) / l.length;\n};\nvar listVar = function(l, mu) {\n  var mu = mu === undefined ? listMean(l) : mu;\n  return mapReduce1(plus, function(a) {\n    return (a - mu) * (a - mu);\n  }, l) / l.length;\n};\nvar listStdev = function(l, mu) {\n  return Math.sqrt(listVar(l, mu));\n};\n\nvar normalize = function(xs) {\n  var Z = sum(xs);\n  return map(function(x) {\n    return x / Z;\n  }, xs);\n};\n\nvar all = function(p, l) {\n  if (l.length === 0) {\n    return true\n  } else {\n    return mapReduce1(and, p, l);\n  }\n};\n\nvar any = function(p, l) {\n  if (l.length === 0) {\n    return false\n  } else {\n    return mapReduce1(or, p, l);\n  }\n};\n\nvar zip = function(xs, ys) {\n  return map2(function(x, y) { return [x, y]},\n              xs,\n              ys)\n};\n\nvar filter = function(fn, ar) {\n  var helper = function(i, j) {\n    var n = j - i + 1;\n    if (n == 0) {\n      return [];\n    } else if (n == 1) {\n      return (fn(ar[i]) ? [ar[i]] : []);\n    } else {\n      var n1 = Math.ceil(n / 2);\n      return helper(i, i + n1 - 1).concat(helper(i + n1, j));\n    }\n  }\n\n  return helper(0, ar.length - 1)\n};\n\nvar find = function(f, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return undefined;\n    } else if (f(ar[i])) {\n      return ar[i];\n    } else {\n      return helper(i + 1);\n    }\n  }\n  return helper(0);\n};\n\nvar remove = function(a, ar) {\n  return filter(function(e) {\n    return a != e;\n  }, ar);\n};\n\nvar insertAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i));\n}\n\nvar removeAt = function(ar, i) {\n  return ar.slice(0, i).concat(ar.slice(i + 1));\n}\n\nvar replaceAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i + 1));\n}\n\nvar drop = function(n, ar) {\n  return n > ar.length ? [] : ar.slice(n);\n};\n\nvar take = function(n, ar) {\n  return n >= ar.length ? ar : ar.slice(0, n);\n};\n\nvar dropWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n  return ar.slice(helper(0));\n};\n\nvar takeWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n\n  return ar.slice(0, helper(0));\n};\n\nvar indexOf = function(x, xs) {\n  // prototype method doesn't return falsy value if not found\n  var i = xs.indexOf(x);\n  return i < 0 ? undefined : i\n};\n\nvar minWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] < _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [Infinity, Infinity]);\n};\n\nvar maxWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] > _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [-Infinity, -Infinity]);\n};\n\n// bin array into items satisfying a predicate p and items not satifying it\nvar span = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i, _ts, _fs) {\n    return (i === n ?\n            [_ts, _fs] :\n            (p(ar[i]) ?\n             helper(i + 1, snoc(_ts, ar[i]), _fs) :\n             helper(i + 1, _ts, snoc(_fs, ar[i]))));\n  };\n  return helper(0, [], []);\n};\n\n// group array items by a comparator\n// NB: there is still room for optimization here\nvar groupBy = function(cmp, ar) {\n  if (ar.length === 0) {\n    return [];\n  } else {\n    var x = ar[0];\n    var sp = span(function(b) { return cmp(x, b); }, ar.slice(1));\n    return [cons(x, sp[0])].concat(groupBy(cmp, sp[1]));\n  }\n};\n\nvar repeat = function(n, fn) {\n  var helper = function(m) {\n    if (m == 0) {\n      return [];\n    } else if (m == 1) {\n      return [fn()];\n    } else {\n      var m1 = Math.ceil(m / 2),\n          m2 = m - m1;\n      return helper(m1).concat(helper(m2));\n    }\n  }\n\n  return helper(n);\n}\n\n\nvar push = function(xs, x) {\n  return xs.concat([x]);\n};\n\nvar compose = function(f, g) {\n  return function(x) {\n    return f(g(x));\n  };\n};\n\nvar everyOther = function(l) {\n  return l.length <= 1 ? l : [l[0]].concat(everyOther(l.slice(2)));\n};\n\nvar _merge = function(l1, l2, pred, key) {\n  return (l1.length === 0 ?\n          l2 :\n          (l2.length === 0 ?\n           l1 :\n           (pred(key(l1[0]), key(l2[0])) ?\n            [l1[0]].concat(_merge(l1.slice(1), l2, pred, key)) :\n            [l2[0]].concat(_merge(l1, l2.slice(1), pred, key)))));\n};\n\nvar _sort = function(l, pred, key) {\n  return ((l.length <= 1) ?\n          l :\n          _merge(_sort(everyOther(l), pred, key),\n                 _sort(everyOther(l.slice(1)), pred, key),\n                 pred,\n                 key));\n};\n\nvar sort = function(l, pred, key) {\n  return _sort(l, (pred || lt), (key || idF));\n};\n\nvar sortOn = function(l, key, pred) {\n  return _sort(l, (pred || lt), key);\n};\n\nvar condition = function(bool) {\n  factor(bool ? 0 : -Infinity);\n};\n\nvar MH = function(wpplFn, samples, burn) {\n  return MCMC(wpplFn, { samples: samples, burn: burn });\n};\n\nvar ParticleFilter = function(wpplFn, particles) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: 0 });\n};\n\nvar ParticleFilterRejuv = function(wpplFn, particles, rejuvSteps) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: rejuvSteps });\n};\n";
-  var headerMacroModule = "operator (|>) 0 left { $val, $f } => #{ $f($val) }\nexport (|>)\n\n// mirror ad macros to work-around issue #382.\n// https://github.com/dritchie/adnn/blob/master/ad/macros.sjs\n\noperator +   14 { $r } => #{ ad.scalar.add(0, $r) }\noperator -   14 { $r } => #{ ad.scalar.sub(0, $r) }\noperator *   13 left { $l, $r } => #{ ad.scalar.mul($l, $r) }\noperator /   13 left { $l, $r } => #{ ad.scalar.div($l, $r) }\noperator %   13 left { $l, $r } => #{ ad.scalar.mod($l, $r) }\noperator +   12 left { $l, $r } => #{ ad.scalar.add($l, $r) }\noperator -   12 left { $l, $r } => #{ ad.scalar.sub($l, $r) }\noperator <   10 left { $l, $r } => #{ ad.scalar.lt($l, $r) }\noperator <=  10 left { $l, $r } => #{ ad.scalar.leq($l, $r) }\noperator >   10 left { $l, $r } => #{ ad.scalar.gt($l, $r) }\noperator >=  10 left { $l, $r } => #{ ad.scalar.geq($l, $r) }\noperator ==   9 left { $l, $r } => #{ ad.scalar.eq($l, $r) }\noperator !=   9 left { $l, $r } => #{ ad.scalar.neq($l, $r) }\noperator ===  9 left { $l, $r } => #{ ad.scalar.peq($l, $r) }\noperator !==  9 left { $l, $r } => #{ ad.scalar.pneq($l, $r) }\n\nmacro ++ {\n  rule { $r } => { $r = $r + 1 }\n  rule infix { $l | } => { $l = $l + 1 }\n}\nmacro -- {\n  rule { $r } => { $r = $r - 1 }\n  rule infix { $l | } => { $l = $l - 1 }\n}\n\nmacro += {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var + $exprVal }\n}\nmacro -= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var - $exprVal }\n}\nmacro /= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var / $exprVal }\n}\nmacro *= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var * $exprVal }\n}\n\nmacro Math {\n  rule { .$x } => { ad.scalar.$x }\n}\n\nexport +\nexport -\nexport *\nexport /\nexport <\nexport <=\nexport >\nexport >=\nexport ==\nexport !=\nexport ===\nexport !==\nexport ++\nexport --\nexport +=\nexport -=\nexport /=\nexport *=\nexport Math\n";
+  var code = "'no caching';\n\n// Distributions (note: this gets macro transformed)\n\ndefineDistConstructors(\n    Bernoulli\n    Uniform\n    UniformDrift\n    RandomInteger\n    Gaussian\n    GaussianDrift\n    MultivariateGaussian\n    Cauchy\n    Discrete\n    Gamma\n    Exponential\n    Beta\n    Binomial\n    Multinomial\n    Poisson\n    Dirichlet\n    DirichletDrift\n    Categorical\n    Delta);\n\n// Helpers to sample from distributions.\n\nvar bernoulli = function(arg) {\n  var params = dists.isParams(arg) ? arg : {p: arg};\n  return sample(Bernoulli(params));\n};\n\nvar randomInteger = function(arg) {\n  var params = dists.isParams(arg) ? arg : {n: arg};\n  return sample(RandomInteger(params));\n};\n\nvar discrete = function(arg) {\n  var params = dists.isParams(arg) ? arg : {ps: arg};\n  return sample(Discrete(params));\n};\n\nvar multinomial = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {ps: arg1, n: arg2};\n  return sample(Multinomial(params));\n};\n\nvar gaussian = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {mu: arg1, sigma: arg2};\n  return sample(Gaussian(params));\n};\n\nvar multivariateGaussian = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {mu: arg1, cov: arg2};\n  return sample(MultivariateGaussian(params));\n};\n\nvar cauchy = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {location: arg1, scale: arg2};\n  return sample(Cauchy(params));\n};\n\nvar uniform = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {a: arg1, b: arg2};\n  return sample(Uniform(params));\n};\n\nvar dirichlet = function(arg) {\n  var params = dists.isParams(arg) ? arg : {alpha: arg};\n  return sample(Dirichlet(params));\n};\n\nvar poisson = function(arg) {\n  var params = dists.isParams(arg) ? arg : {mu: arg};\n  return sample(Poisson(params));\n};\n\nvar binomial = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {p: arg1, n: arg2};\n  return sample(Binomial(params));\n};\n\nvar beta = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {a: arg1, b: arg2};\n  return sample(Beta(params));\n};\n\nvar exponential = function(arg) {\n  var params = dists.isParams(arg) ? arg : {a: arg};\n  return sample(Exponential(params));\n};\n\nvar gamma = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {shape: arg1, scale: arg2};\n  return sample(Gamma(params));\n};\n\n// Other distribution helpers\n\nvar flip = function(p) {\n  var params = {p: (p !== undefined) ? p : .5};\n  return sample(Bernoulli(params));\n};\n\nvar categorical = function(arg1, arg2) {\n  var params = dists.isParams(arg1) ? arg1 : {ps: arg1, vs: arg2};\n  return params.vs[discrete(params.ps)];\n};\n\nvar delta = function(arg) {\n  var params = dists.isParams(arg) ? arg : {v: arg};\n  return sample(Delta(params));\n};\n\nvar uniformDraw = function(arg) {\n  var vs = dists.isParams(arg) ? arg.vs : arg;\n  return vs[sample(RandomInteger({n: vs.length}))];\n};\n\nvar serializeDist = function(d) {\n  return dists.serialize(d);\n};\n\nvar deserializeDist = function(JSONString) {\n  return dists.deserialize(JSONString);\n};\n\nvar withImportanceDist = function(d, importanceDist) {\n  return dists.withImportanceDist(d, importanceDist);\n};\n\n// XRPs\n\nvar makeBetaBernoulli = function(pseudocounts) {\n  globalStore.BBindex = 1 + (globalStore.BBindex || 0);\n  var bbname = 'BB' + globalStore.BBindex;\n  globalStore[bbname] = pseudocounts;\n  return function() {\n    var pc = globalStore[bbname];  // get current sufficient stats\n    var val = sample(Bernoulli({p: pc[0] / (pc[0] + pc[1])}));  // sample from predictive.\n    globalStore[bbname] = [pc[0] + val, pc[1] + !val];  // update sufficient stats\n    return val;\n  };\n};\n\nvar makeDirichletDiscrete = function(pseudocounts) {\n  var addCount = function(a, i, j) {\n    var j = j || 0;\n    if (a.length === 0) {\n      return [];\n    } else {\n      return [a[0] + (i === j)].concat(addCount(a.slice(1), i, j + 1));\n    }\n  };\n  globalStore.DDindex = 1 + (globalStore.DDindex || 0);\n  var ddname = 'DD' + globalStore.DDindex;\n  globalStore[ddname] = pseudocounts;\n  return function() {\n    var pc = globalStore[ddname];  // get current sufficient stats\n    var val = sample(Discrete({ps: pc}));  // sample from predictive. (doesn't need to be normalized.)\n    globalStore[ddname] = addCount(pc, val); // update sufficient stats\n    return val;\n  };\n};\n\n// Arithmetic and other functionals\n\nvar plus = function(a, b) {\n  return a + b;\n};\nvar minus = function(a, b) {\n  return a - b;\n};\nvar mult = function(a, b) {\n  return a * b;\n};\nvar div = function(a, b) {\n  return a / b;\n};\n\nvar and = function(a, b) {\n  return a && b\n}\nvar or = function(a, b) {\n  return a || b\n}\n\nvar eq = function(a, b) {\n  return a === b;\n};\nvar neq = function(a, b) {\n  return a != b;\n};\nvar lt = function(a, b) {\n  return a < b;\n};\nvar gt = function(a, b) {\n  return a > b;\n};\nvar leq = function(a, b) {\n  return a <= b;\n};\nvar geq = function(a, b) {\n  return a >= b;\n};\n\nvar isEven = function(v) {\n  return v % 2 === 0;\n};\nvar isOdd = function(v) {\n  return v % 2 != 0;\n};\n\nvar idF = function(x) {\n  return x;\n};\nvar constF = function(f) {\n  return function() {\n    return f;\n  };\n};\nvar falseF = function() {\n  return false;\n};\nvar trueF = function() {\n  return true;\n};\n\n// Probability computations & calculations\n\nvar MAP = function(dist) {\n  return dist.MAP();\n};\n\nvar expectation = function(dist, func) {\n  var f = func || idF;\n  var supp = dist.support();\n  return mapReduce1(plus,\n                    function(s) {\n                      return Math.exp(dist.score(s)) * f(s);\n                    },\n                    supp);\n};\n\nvar entropy = function(dist) {\n  return dist.entropy();\n};\n\n// Data structures & higher-order functions\n\nvar append = function(a, b) {\n  return a.concat(b);\n};\nvar cons = function(a, b) {\n  return [a].concat(b);\n};\nvar snoc = function(a, b) {\n  return a.concat([b]);\n};\n\nvar first = function(xs) {\n  return xs[0];\n};\nvar second = function(xs) {\n  return xs[1];\n};\nvar third = function(xs) {\n  return xs[2];\n};\nvar fourth = function(xs) {\n  return xs[3];\n};\nvar secondLast = function(xs) {\n  return xs[xs.length - 2];\n};\nvar last = function(xs) {\n  return xs[xs.length - 1];\n};\n\nvar most = function(xs) {\n  return xs.slice(0, xs.length - 1);\n}\n\nvar rest = function(xs) {\n  return xs.slice(1);\n};\n\nvar map_helper = function(i, j, f) {\n  var n = j - i + 1;\n  if (n == 0) {\n    return []\n  } else if (n == 1) {\n    return [f(i)];\n  } else {\n    var n1 = Math.ceil(n / 2);\n    return map_helper(i, i + n1 - 1, f).concat(map_helper(i + n1, j, f));\n  }\n}\n\n// recursively split input array so that we only call\n// concat a logarithmic number of times\nvar map = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(l[i]) })\n}\n\n// assumes that length l1 == length l2\nvar map2 = function(fn, l1, l2) {\n  return map_helper(0, l1.length - 1, function(i) { return fn(l1[i], l2[i]) })\n}\n\n// sugar for map(f, [0,1,...,n-1])\nvar mapN = function(fn, n) {\n  return map_helper(0, n - 1, function(i) { return fn(i) })\n}\n\nvar mapIndexed = function(fn, l) {\n  return map_helper(0, l.length - 1, function(i) { return fn(i, l[i]) })\n}\n\nvar _ringAround = function(l, n) {\n  return l.slice(n).concat(l.slice(0, n));\n};\n\nvar ringForward = function(l, n) {\n  return _ringAround(l, n === undefined ? -1 : -n);\n};\n\nvar ringBackward = function(l, n) {\n  return _ringAround(l, n === undefined ? 1 : n);\n};\n\n// map through the cartesian product l1 * l2\nvar mapPairs2 = function(f, l1, l2) {\n  var res = map(function(a) {\n    return map(function(b) {\n      return f(a, b);\n    }, l2)\n  }, l1);\n  return [].concat.apply([], res); // flatten\n};\n\n// map through all 2-combinations of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], and ['b','c']\nvar mapPairsC = function(f, l) {\n  var n = l.length;\n\n  var helper = function(i) {\n    if (i === n) {\n      return [];\n    } else {\n      // compute {f(i,j)} where j \\in {i+1,...,n}\n      var r = mapN(\n          function(k) {\n            var j = i + k + 1;\n            return f(l[i], l[j])\n          },\n          n - (i + 1));\n\n      return append(r, helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// map through all 2-tuples of elements in l\n// e.g., mapPairsC(f, ['a','b','c']) will operate on ['a','b'],\n// ['a','c'], ['b','a'], ['b','c'], ['c','a'], ['c','b']\nvar mapPairsNC = function(f, l) {\n  var res = mapPairs2(function(a, b) {\n    return a === b ? undefined : f(a, b);\n  }, l, l);\n  return remove(undefined, res);\n};\n\nvar mapObject = function(fn, obj) {\n  return _.object(\n      map(\n      function(kv) {\n        return [kv[0], fn(kv[0], kv[1])]\n      },\n      _.pairs(obj))\n  );\n};\n\nvar reduce = function(fn, init, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return init\n    } else {\n      return fn(ar[i], helper(i + 1))\n    }\n  }\n\n  return helper(0);\n};\n\n// sugar for reduce(f, g(init), map(g,ar))\nvar mapReduce = function(f, init, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(init),\n                ar);\n};\n\n// sugar for reduce(f, g(last(ar)), map(g, butLast(ar)))\nvar mapReduce1 = function(f, g, ar) {\n  // specialized to above reduce\n  return reduce(function(a, b) {return f(g(a), b);},\n                g(ar[ar.length - 1]),\n                ar.slice(0, -1));\n};\n\nvar sum = function(l) {\n  return reduce(plus, 0, l);\n};\nvar product = function(l) {\n  return reduce(mult, 1, l);\n};\n\nvar listMean = function(l) {\n  return reduce(plus, 0, l) / l.length;\n};\nvar listVar = function(l, mu) {\n  var mu = mu === undefined ? listMean(l) : mu;\n  return mapReduce1(plus, function(a) {\n    return (a - mu) * (a - mu);\n  }, l) / l.length;\n};\nvar listStdev = function(l, mu) {\n  return Math.sqrt(listVar(l, mu));\n};\n\nvar normalize = function(xs) {\n  var Z = sum(xs);\n  return map(function(x) {\n    return x / Z;\n  }, xs);\n};\n\nvar all = function(p, l) {\n  if (l.length === 0) {\n    return true\n  } else {\n    return mapReduce1(and, p, l);\n  }\n};\n\nvar any = function(p, l) {\n  if (l.length === 0) {\n    return false\n  } else {\n    return mapReduce1(or, p, l);\n  }\n};\n\nvar zip = function(xs, ys) {\n  return map2(function(x, y) { return [x, y]},\n              xs,\n              ys)\n};\n\nvar filter = function(fn, ar) {\n  var helper = function(i, j) {\n    var n = j - i + 1;\n    if (n == 0) {\n      return [];\n    } else if (n == 1) {\n      return (fn(ar[i]) ? [ar[i]] : []);\n    } else {\n      var n1 = Math.ceil(n / 2);\n      return helper(i, i + n1 - 1).concat(helper(i + n1, j));\n    }\n  }\n\n  return helper(0, ar.length - 1)\n};\n\nvar find = function(f, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return undefined;\n    } else if (f(ar[i])) {\n      return ar[i];\n    } else {\n      return helper(i + 1);\n    }\n  }\n  return helper(0);\n};\n\nvar remove = function(a, ar) {\n  return filter(function(e) {\n    return a != e;\n  }, ar);\n};\n\nvar insertAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i));\n}\n\nvar removeAt = function(ar, i) {\n  return ar.slice(0, i).concat(ar.slice(i + 1));\n}\n\nvar replaceAt = function(ar, i, x) {\n  return ar.slice(0, i).concat([x]).concat(ar.slice(i + 1));\n}\n\nvar drop = function(n, ar) {\n  return n > ar.length ? [] : ar.slice(n);\n};\n\nvar take = function(n, ar) {\n  return n >= ar.length ? ar : ar.slice(0, n);\n};\n\nvar dropWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n  return ar.slice(helper(0));\n};\n\nvar takeWhile = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i) {\n    if (i === n) {\n      return n;\n    }\n    return p(ar[i]) ? helper(i + 1) : i;\n  }\n\n  return ar.slice(0, helper(0));\n};\n\nvar indexOf = function(x, xs) {\n  // prototype method doesn't return falsy value if not found\n  var i = xs.indexOf(x);\n  return i < 0 ? undefined : i\n};\n\nvar minWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] < _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [Infinity, Infinity]);\n};\n\nvar maxWith = function(f, ar) {\n  var fn = function(_ar, _best) {\n    if (_ar.length === 0) {\n      return _best;\n    } else if (_ar[0][1] > _best[1]) {\n      return fn(_ar.slice(1), _ar[0]);\n    } else {\n      return fn(_ar.slice(1), _best);\n    }\n  };\n  return fn(zip(ar, map(f, ar)), [-Infinity, -Infinity]);\n};\n\n// bin array into items satisfying a predicate p and items not satifying it\nvar span = function(p, ar) {\n  var n = ar.length;\n  var helper = function(i, _ts, _fs) {\n    return (i === n ?\n            [_ts, _fs] :\n            (p(ar[i]) ?\n             helper(i + 1, snoc(_ts, ar[i]), _fs) :\n             helper(i + 1, _ts, snoc(_fs, ar[i]))));\n  };\n  return helper(0, [], []);\n};\n\n// group array items by a comparator\n// NB: there is still room for optimization here\nvar groupBy = function(cmp, ar) {\n  if (ar.length === 0) {\n    return [];\n  } else {\n    var x = ar[0];\n    var sp = span(function(b) { return cmp(x, b); }, ar.slice(1));\n    return [cons(x, sp[0])].concat(groupBy(cmp, sp[1]));\n  }\n};\n\nvar repeat = function(n, fn) {\n  var helper = function(m) {\n    if (m == 0) {\n      return [];\n    } else if (m == 1) {\n      return [fn()];\n    } else {\n      var m1 = Math.ceil(m / 2),\n          m2 = m - m1;\n      return helper(m1).concat(helper(m2));\n    }\n  }\n\n  return helper(n);\n}\n\n\nvar push = function(xs, x) {\n  return xs.concat([x]);\n};\n\nvar compose = function(f, g) {\n  return function(x) {\n    return f(g(x));\n  };\n};\n\nvar everyOther = function(l) {\n  return l.length <= 1 ? l : [l[0]].concat(everyOther(l.slice(2)));\n};\n\nvar _merge = function(l1, l2, pred, key) {\n  return (l1.length === 0 ?\n          l2 :\n          (l2.length === 0 ?\n           l1 :\n           (pred(key(l1[0]), key(l2[0])) ?\n            [l1[0]].concat(_merge(l1.slice(1), l2, pred, key)) :\n            [l2[0]].concat(_merge(l1, l2.slice(1), pred, key)))));\n};\n\nvar _sort = function(l, pred, key) {\n  return ((l.length <= 1) ?\n          l :\n          _merge(_sort(everyOther(l), pred, key),\n                 _sort(everyOther(l.slice(1)), pred, key),\n                 pred,\n                 key));\n};\n\nvar sort = function(l, pred, key) {\n  return _sort(l, (pred || lt), (key || idF));\n};\n\nvar sortOn = function(l, key, pred) {\n  return _sort(l, (pred || lt), key);\n};\n\nvar condition = function(bool) {\n  factor(bool ? 0 : -Infinity);\n};\n\nvar MH = function(wpplFn, samples, burn) {\n  return MCMC(wpplFn, { samples: samples, burn: burn });\n};\n\nvar ParticleFilter = function(wpplFn, particles) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: 0 });\n};\n\nvar ParticleFilterRejuv = function(wpplFn, particles, rejuvSteps) {\n  return SMC(wpplFn, { particles: particles, rejuvSteps: rejuvSteps });\n};\n\nvar Infer = function(options, wpplFn) {\n  if (!util.isObject(options)) {\n    util.fatal('Infer: expected first argument to be an options object.');\n  }\n  if (!_.isFunction(wpplFn)) {\n    util.fatal('Infer: expected second argument to be a function.');\n  }\n\n  // Map from camelCase options to PascalCase coroutine names. Also\n  // used to ensure the supplied method name is a valid inference\n  // routine.\n  var methodMap = {\n    SMC: SMC,\n    MCMC: MCMC,\n    PMCMC: PMCMC,\n    asyncPF: AsyncPF,\n    rejection: Rejection,\n    enumerate: Enumerate,\n    incrementalMH: IncrementalMH\n  };\n\n  var methodName = options.method;\n  if (methodName === undefined) {\n    util.fatal('Infer: the \\'method\\' option must be specified.');\n  }\n  if (!_.has(methodMap, methodName)) {\n    util.fatal('Infer: unknown method \\'' + methodName + '\\'.');\n  }\n  var method = methodMap[methodName];\n  return method(wpplFn, _.omit(options, 'method'));\n};\n";
+  var headerMacroModule = "operator (|>) 0 left { $val, $f } => #{ $f($val) }\nexport (|>)\n\nmacro defineDistConstructors {\n  rule { ($name ...) } => {\n    $(\n      var $name = function(params) {\n        return util.jsnew(dists.$name, params);\n      };\n    ) ...\n  }\n}\n\nexport defineDistConstructors\n\n// mirror ad macros to work-around issue #382.\n// https://github.com/dritchie/adnn/blob/master/ad/macros.sjs\n\noperator +   14 { $r } => #{ ad.scalar.add(0, $r) }\noperator -   14 { $r } => #{ ad.scalar.sub(0, $r) }\noperator *   13 left { $l, $r } => #{ ad.scalar.mul($l, $r) }\noperator /   13 left { $l, $r } => #{ ad.scalar.div($l, $r) }\noperator %   13 left { $l, $r } => #{ ad.scalar.mod($l, $r) }\noperator +   12 left { $l, $r } => #{ ad.scalar.add($l, $r) }\noperator -   12 left { $l, $r } => #{ ad.scalar.sub($l, $r) }\noperator <   10 left { $l, $r } => #{ ad.scalar.lt($l, $r) }\noperator <=  10 left { $l, $r } => #{ ad.scalar.leq($l, $r) }\noperator >   10 left { $l, $r } => #{ ad.scalar.gt($l, $r) }\noperator >=  10 left { $l, $r } => #{ ad.scalar.geq($l, $r) }\noperator ==   9 left { $l, $r } => #{ ad.scalar.eq($l, $r) }\noperator !=   9 left { $l, $r } => #{ ad.scalar.neq($l, $r) }\noperator ===  9 left { $l, $r } => #{ ad.scalar.peq($l, $r) }\noperator !==  9 left { $l, $r } => #{ ad.scalar.pneq($l, $r) }\n\nmacro ++ {\n  rule { $r } => { $r = $r + 1 }\n  rule infix { $l | } => { $l = $l + 1 }\n}\nmacro -- {\n  rule { $r } => { $r = $r - 1 }\n  rule infix { $l | } => { $l = $l - 1 }\n}\n\nmacro += {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var + $exprVal }\n}\nmacro -= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var - $exprVal }\n}\nmacro /= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var / $exprVal }\n}\nmacro *= {\n  rule infix { $var:expr | $exprVal:expr } => { $var = $var * $exprVal }\n}\n\nmacro Math {\n  rule { .$x } => { ad.scalar.$x }\n}\n\nexport +\nexport -\nexport *\nexport /\nexport <\nexport <=\nexport >\nexport >=\nexport ==\nexport !=\nexport ===\nexport !==\nexport ++\nexport --\nexport +=\nexport -=\nexport /=\nexport *=\nexport Math\n";
   return { wppl: [{ code: code, filename: 'header.wppl' }], macros: [headerMacroModule] };
 }
 
@@ -61869,10 +62375,10 @@ function compile(code, options) {
   var transforms = options.transforms || [
     thunkify,
     naming,
+    varargs,
     cps,
     store,
     optimize,
-    varargs,
     trampoline
   ];
 
@@ -61880,7 +62386,8 @@ function compile(code, options) {
     var macros = _.chain(bundles).pluck('macros').flatten().uniq().value();
     var programAst = parse(code, macros, options.filename);
     var asts = _.pluck(bundles, 'ast').map(copyAst).concat(programAst);
-    var doCaching = _.any(asts, caching.transformRequired);
+    assert.strictEqual(bundles[0].filename, 'header.wppl');
+    var doCaching = _.any(asts.slice(1), caching.transformRequired);
 
     if (options.verbose && doCaching) {
       console.log('Caching transform will be applied.');
@@ -62140,7 +62647,7 @@ module.exports = {
 
 var _ = require('underscore');
 var assert = require('assert');
-var isErp = require('./erp').isErp;
+var isDist = require('./dists').isDist;
 var ad = require('./ad');
 
 var Trace = function(wpplFn, s, k, a) {
@@ -62188,12 +62695,11 @@ Trace.prototype.continue = function() {
   }
 };
 
-Trace.prototype.addChoice = function(erp, params, val, address, store, continuation) {
+Trace.prototype.addChoice = function(dist, val, address, store, continuation) {
   // Called at sample statements.
   // Adds the choice to the DB and updates current score.
 
-  // assert(isErp(erp));
-  // assert(_.isUndefined(params) || _.isArray(params));
+  // assert(isDist(dist));
   // assert(_.isString(address));
   // assert(_.isObject(store));
   // assert(_.isFunction(continuation));
@@ -62201,8 +62707,7 @@ Trace.prototype.addChoice = function(erp, params, val, address, store, continuat
   var choice = {
     k: continuation,
     address: address,
-    erp: erp,
-    params: params,
+    dist: dist,
     // Record the score without adding the choiceScore. This is the score we'll
     // need if we regen from this choice.
     score: this.score,
@@ -62214,7 +62719,7 @@ Trace.prototype.addChoice = function(erp, params, val, address, store, continuat
   this.choices.push(choice);
   this.addressMap[address] = choice;
   this.length += 1;
-  this.score = ad.scalar.add(this.score, erp.score(params, val));
+  this.score = ad.scalar.add(this.score, dist.score(val));
   // this.checkConsistency();
 };
 
@@ -62276,7 +62781,7 @@ Trace.prototype.checkConsistency = function() {
 
 module.exports = Trace;
 
-},{"./ad":152,"./erp":162,"assert":192,"underscore":151}],182:[function(require,module,exports){
+},{"./ad":152,"./dists":162,"assert":192,"underscore":151}],182:[function(require,module,exports){
 'use strict';
 
 var _ = require('underscore');
@@ -62306,21 +62811,22 @@ var cacheExempt = [
   'sampleWithFactor'
 ];
 var cacheExemptTable = {};
-_.each(cacheExempt, function(erpname) {
-  cacheExemptTable[erpname] = true;
+_.each(cacheExempt, function(funcName) {
+  cacheExemptTable[funcName] = true;
 });
 cacheExempt = cacheExemptTable;
 
 function shouldCache(callee) {
-  // Don't cache 'primitive' functions. It actually could be benficial to cache
+  // Don't cache 'primitive' functions. It actually could be beneficial to cache
   //    these in some cases, but correctly binding 'this' will require some
   //    systemic changes that I don't want to deal with right now.
   if (isPrimitive(callee))
     return false;
-  // Don't cache ERPs or other coroutine functions that deal with ERPs.
+  // Don't cache sampling helpers or other coroutine functions that
+  // deal with distributions.
   // Why do this? If the cache adaptation decides to remove one of these functions,
-  //    then that function will have the same address as the ERP it's dealing with,
-  //    so the adapter will also try to remove the ERP.
+  //    then that function will have the same address as the distribution it's dealing with,
+  //    so the adapter will also try to remove the distribution.
   // Basically, a core assumption of IncrementalMH is that all cache nodes have unique
   //    addresses.
   if (callee.type === Syntax.Identifier && cacheExempt[callee.name])
@@ -62346,11 +62852,23 @@ function cachingMain(node) {
   return estraverse.replace(node, { leave: exit });
 }
 
+
+function isImhIdentifier(node) {
+  return node.type === 'Identifier' && node.name === 'IncrementalMH';
+}
+
+function isImhInferMethodOption(node) {
+  return node.type === 'Property' &&
+      ((node.key.type === 'Identifier' && node.key.name === 'method') ||
+      (node.key.type === 'Literal' && node.key.value === 'method')) &&
+      (node.value.type === 'Literal' && node.value.value === 'incrementalMH');
+}
+
 function transformRequired(programAST) {
   var flag = false;
   estraverse.traverse(programAST, {
     enter: function(node) {
-      if (node.type === 'Identifier' && node.name === 'IncrementalMH') {
+      if (isImhIdentifier(node) || isImhInferMethodOption(node)) {
         flag = true;
         this.break();
       }
@@ -63172,31 +63690,29 @@ function makeArgumentsIdentifier() {
   return '_arguments' + argumentsIdCounter;
 }
 
-function findEnclosingFunctionNode(node) {
-  var ancestor = node;
-  while (ancestor !== undefined) {
-    if (ancestor.type === 'FunctionExpression') {
-      break;
-    }
-    ancestor = ancestor.parentNode;
+var fnStack = [];
+
+function pushFn(node) {
+  if (node.type === Syntax.FunctionExpression) {
+    fnStack.push(node);
   }
-  if (ancestor === undefined) {
-    throw 'Used "arguments" outside of function context!';
-  }
-  return ancestor;
 }
 
-function addParents(node, parent) {
-  node.parentNode = parent;
-  return node;
+function popFn(node) {
+  if (node.type === Syntax.FunctionExpression) {
+    assert.strictEqual(node, fnStack[fnStack.length - 1]);
+    fnStack.pop();
+  }
+}
+
+function getEnclosingFunctionNode() {
+  if (fnStack.length === 0) {
+    throw 'Used "arguments" outside of function context!';
+  }
+  return fnStack[fnStack.length - 1];
 }
 
 function varargs(node) {
-
-  if (node.seenByVarargs) {
-    return node;
-  }
-  node.seenByVarargs = true;
 
   switch (node.type) {
 
@@ -63206,7 +63722,7 @@ function varargs(node) {
       if (node.name !== 'arguments') {
         return node;
       }
-      var functionNode = findEnclosingFunctionNode(node);
+      var functionNode = getEnclosingFunctionNode();
       var argumentsId = functionNode.argumentsId || makeArgumentsIdentifier();
       node.name = argumentsId;
       if (functionNode.argumentsId === undefined) {
@@ -63224,13 +63740,19 @@ function varargs(node) {
 
   }
 
+
 }
 
 function varargsMain(node) {
   node = estraverse.replace(
       node, {
-        enter: addParents,
-        leave: varargs
+        enter: function(node) {
+          pushFn(node);
+          return varargs(node);
+        },
+        leave: function(node) {
+          popFn(node);
+        }
       });
   return node;
 }
@@ -63422,6 +63944,13 @@ function mergeDefaults(options, defaults) {
   return _.defaults(options ? _.clone(options) : {}, defaults);
 }
 
+function throwUnlessOpts(options, fnName) {
+  assert.ok(fnName);
+  if (options !== undefined && !_.isObject(options)) {
+    throw fnName + ' expected an options object but received: ' + JSON.stringify(options);
+  }
+}
+
 function InfToJSON(k, v) {
   if (v === Infinity) {
     return 'Infinity';
@@ -63475,6 +64004,19 @@ function warn(msg) {
   }
 }
 
+function fatal(msg) {
+  throw msg;
+}
+
+function jsnew(ctor, arg) {
+  return new ctor(arg);
+}
+
+// Unlike _.isObject this returns false for arrays and functions.
+function isObject(x) {
+  return x !== undefined && Object.getPrototypeOf(x) === Object.prototype;
+}
+
 module.exports = {
   trampolineRunners: trampolineRunners,
   random: random,
@@ -63494,6 +64036,7 @@ module.exports = {
   prettyJSON: prettyJSON,
   runningInBrowser: runningInBrowser,
   mergeDefaults: mergeDefaults,
+  throwUnlessOpts: throwUnlessOpts,
   sum: sum,
   product: product,
   asArray: asArray,
@@ -63501,7 +64044,10 @@ module.exports = {
   deserialize: deserialize,
   timeif: timeif,
   pipeline: pipeline,
-  warn: warn
+  warn: warn,
+  fatal: fatal,
+  jsnew: jsnew,
+  isObject: isObject
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
