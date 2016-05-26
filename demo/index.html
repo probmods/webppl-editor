@@ -38,9 +38,15 @@
   <body>
     <div id="wrapper">
       <b>tricky reference error</b>:
-      <pre id="tricky-reference-error"><code>print('started');
+      <pre><code>print('started');
 var x = sum(repeat(1e5, flip))
 tricky
+print('ended')</code></pre>
+
+      <b>throwing strings</b>:
+      <pre><code>print('started');
+var x = sum(repeat(1e5, flip))
+window.throwString();
 print('ended')</code></pre>
 
       <b>MCMC callback:</b>
@@ -154,6 +160,10 @@ MH(
    $("pre").map(function(i,el) {
        wpEditor.setup(el, {language: getLanguage($(el).text())})
    })
+
+       var throwString = function() {
+           throw 'string error'
+       }
   </script>
 
   <script src="webppl.js" defer></script>

@@ -219,6 +219,15 @@ var CodeEditor = React.createClass({
       }
     }
 
+    var handleError = function(e) {
+      if (typeof e == 'string') {
+          e = {message: e,
+               stack: []
+              }
+      }
+      comp.addResult({type: 'error', message: e.message, stack: e.stack});
+    }
+
     var job = function() {
 
       // run vanilla js
@@ -229,7 +238,7 @@ var CodeEditor = React.createClass({
           var res = eval(code);
           endJob({}, res);
         } catch(e) {
-          comp.addResult({type: 'error', message: e.message, stack: e.stack});
+          handleError(e);
           cleanup();
         } finally {
           return;
@@ -259,8 +268,7 @@ var CodeEditor = React.createClass({
           try {
             compileCache[code] = webppl.compile(code)
           } catch (e) {
-            // TODO: better message for returnify
-            comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            handleError(e);
             cleanup();
           }
         }
@@ -271,11 +279,7 @@ var CodeEditor = React.createClass({
           // catch errors that try-catch can't because of trampoline pauses
           // there is some redundancy here but leave it for now
           window.onerror = function(message,url,lineNumber,colNumber,e) {
-            if (e) {
-              comp.addResult({type: 'error', message: e.message, stack: e.stack});
-            } else {
-              comp.addResult({type: 'error', message: message})
-            }
+            handleError(e ? e : message);
             cleanup();
           }
 
@@ -284,7 +288,7 @@ var CodeEditor = React.createClass({
             var _code = eval.call({}, compileCache[code])(util.trampolineRunners.web);
             _code({}, endJob, '');
           } catch(e) {
-            comp.addResult({type: 'error', message: e.message, stack: e.stack});
+            handleError(e);
             cleanup();
           }
 
