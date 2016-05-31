@@ -42005,7 +42005,7 @@ var CodeEditor = React.createClass({
   },
   // ------------------------------------------------------------
   cancelRun: function () {
-    util.trampolineRunners.web.__cancel__ = true;
+    this.runner.__cancel__ = true;
     this.addResult({ type: 'text', message: '[Execution canceled]' });
     this.endJob();
   },
@@ -42045,7 +42045,7 @@ var CodeEditor = React.createClass({
     this.endJob = endJob;
 
     var cleanup = function () {
-      window.onerror = null;
+      global['resumeTrampoline'] = null;
       comp.setState({ execution: 'idle' });
 
       // remove completed job
@@ -42058,11 +42058,10 @@ var CodeEditor = React.createClass({
 
     var handleError = function (e) {
       if (typeof e == 'string') {
-        e = { message: e,
-          stack: []
-        };
+        e = { message: e, stack: [] };
       }
       comp.addResult({ type: 'error', message: e.message, stack: e.stack });
+      cleanup();
     };
 
     var job = function () {
@@ -42076,7 +42075,6 @@ var CodeEditor = React.createClass({
           endJob({}, res);
         } catch (e) {
           handleError(e);
-          cleanup();
         } finally {
           return;
         }
@@ -42107,28 +42105,18 @@ var CodeEditor = React.createClass({
             compileCache[code] = webppl.compile(code);
           } catch (e) {
             handleError(e);
-            cleanup();
           }
         }
 
         comp.setState({ execution: 'running' });
 
-        wait(20, function () {
-          // catch errors that try-catch can't because of trampoline pauses
-          // there is some redundancy here but leave it for now
-          window.onerror = function (message, url, lineNumber, colNumber, e) {
-            handleError(e ? e : message);
-            cleanup();
-          };
+        var runner = util.trampolineRunners.web(handleError);
+        global['resumeTrampoline'] = runner;
+        comp.runner = runner;
 
-          try {
-            // TODO: supply our own runner that is parameterized by error handler?
-            var _code = eval.call({}, compileCache[code])(util.trampolineRunners.web);
-            _code({}, endJob, '');
-          } catch (e) {
-            handleError(e);
-            cleanup();
-          }
+        wait(20, function () {
+          var _code = eval.call({}, compileCache[code])(runner);
+          _code({}, endJob, '');
         });
       });
     };
@@ -42313,6 +42301,8 @@ var globalExport = {
     }
   }
 };
+
+global.CodeEditor = CodeEditor;
 
 global.wpEditor = globalExport;
 
