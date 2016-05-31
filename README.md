@@ -31,6 +31,7 @@ The library installs a single object, `wpEditor`, into the global namespace. `wp
 - `get([key])`: retrieves the object with key `key`. When called with no key, returns the entire store.
 - `MCMCProgress()`: displays a progress bar during MCMC inference (work in progress).
 
+The library also provides a function `resumeTrampoline` for external library functions that need to do asynchronous work.
 
 Development:
 

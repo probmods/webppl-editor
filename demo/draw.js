@@ -113,7 +113,7 @@ function loadImage(s, k, a, drawObject, url){
     raster.position = drawObject.paper.view.center;
     drawObject.redraw();
     var trampoline = k(s);
-    util.trampolineRunners.web(trampoline)
+    resumeTrampoline(trampoline)
   };
   imageObj.src = url;
   return false;
