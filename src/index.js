@@ -470,4 +470,6 @@ var globalExport = {
   }
 }
 
+global.CodeEditor = CodeEditor;
+
 global.wpEditor = globalExport;
