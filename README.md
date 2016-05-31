@@ -1,4 +1,4 @@
-A browser-based code editor for WebPPL (requires version 0.6.2 or higher)
+A browser-based code editor for WebPPL (requires version 0.7.0-f24238e or higher)
 
 Demo: https://probmods.github.io/webppl-editor
 
