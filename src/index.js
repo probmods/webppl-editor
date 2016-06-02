@@ -203,7 +203,7 @@ var CodeEditor = React.createClass({
     this.setState({newborn: false, results: []});
 
     var comp = this;
-    var code = comp.state.code;
+    var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
 
     var endJob = function(store, returnValue) {
@@ -308,11 +308,6 @@ var CodeEditor = React.createClass({
       job()
     }
   },
-  updateCode: function(newCode) {
-    this.setState({
-      code: newCode
-    })
-  },
   addResult: function(result) {
     // discovered alternate form of setState on my own
     // but later stumbled on a good explanation of why we need it at
@@ -322,9 +317,7 @@ var CodeEditor = React.createClass({
     });
   },
   render: function() {
-
     var comp = this;
-
     var options = {
       mode: 'javascript',
       lineNumbers: false,
@@ -341,13 +334,11 @@ var CodeEditor = React.createClass({
         'Cmd-Enter': function(cm) { comp.runCode(); }
       }
     };
-
-
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
         <div ref='cont' className='wpedit'>
-        <CodeMirrorComponent ref='editor' value={this.state.code} onChange={this.updateCode} options={options} codeMirrorInstance={CodeMirror} />
+        <CodeMirrorComponent ref='editor' value={this.state.code} options={options} codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
         <ResultList newborn={this.state.newborn} ref='resultList' executionState={this.state.execution} list={this.state.results} />

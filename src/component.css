@@ -30,9 +30,11 @@
     height: auto;
     border: 1px solid black;
     border-radius: 2px;
+    max-height: 80%;
 }
 .wpedit .CodeMirror-scroll {
     height: auto;
+    max-height: 80%;
 }
 
 .wpedit button {
