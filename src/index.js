@@ -217,6 +217,7 @@ var CodeEditor = React.createClass({
     var cleanup = function() {
       global['print'] = null;
       global['resumeTrampoline'] = null;
+      global['onerror'] = null;
       globalExport['makeResultContainer'] = null;
       comp.setState({execution: 'idle'});
 
@@ -245,10 +246,11 @@ var CodeEditor = React.createClass({
       // note: React automatically binds methods to their class so we don't need to use .bind here
 
       globalExport['makeResultContainer'] = comp['makeResultContainer'];
-      // TODO: to catch errors in, e.g., wpEditor.get()
-      // global.onerror = function(message, source, lineno, colno, e) {
-      //   handleError(e)
-      // }
+      // for catching errors in library code like wpEditor.get()
+      global.onerror = function(message, source, lineno, colno, e) {
+        // TODO: if e is not available, also use source, lineno, and colno
+        handleError(e || message)
+      }
 
       // run vanilla js
       // TODO: detect language from codemirror value, not React prop
