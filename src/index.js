@@ -334,11 +334,14 @@ var CodeEditor = React.createClass({
         'Cmd-Enter': function(cm) { comp.runCode(); }
       }
     };
+
+    var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
+
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
         <div ref='cont' className='wpedit'>
-        <CodeMirrorComponent ref='editor' value={this.props.code} options={options} codeMirrorInstance={CodeMirror} />
+        <CodeMirrorComponent ref='editor' value={code} options={options} codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
         <ResultList newborn={this.state.newborn} ref='resultList' executionState={this.state.execution} list={this.state.results} />
