@@ -147,6 +147,13 @@ var CodeEditor = React.createClass({
   // TODO: remove hist and barChart once webppl-viz stabilizes
   // ------------------------------------------------------------
   print: function(s,k,a,x) {
+    // make print work as a regular js function
+    if (arguments.length == 1) {
+      this.addResult({type: 'text',
+                      message: typeof x == 'object' ? JSON.stringify(arguments[0]) : arguments[0]})
+      return;
+    }
+
     // if x has a custom printer, use it
     if (x.__print__) {
       return k(s, x.__print__(x));
@@ -208,7 +215,9 @@ var CodeEditor = React.createClass({
     this.endJob = endJob;
 
     var cleanup = function() {
+      global['print'] = null;
       global['resumeTrampoline'] = null;
+      globalExport['makeResultContainer'] = null;
       comp.setState({execution: 'idle'});
 
       // remove completed job
@@ -229,6 +238,18 @@ var CodeEditor = React.createClass({
 
     var job = function() {
 
+      // inject this component's side effect methods into global
+      var sideEffectMethods = ['print'];
+      _.each(sideEffectMethods,
+             function(name) { global[name] = comp[name]; });
+      // note: React automatically binds methods to their class so we don't need to use .bind here
+
+      globalExport['makeResultContainer'] = comp['makeResultContainer'];
+      // TODO: to catch errors in, e.g., wpEditor.get()
+      // global.onerror = function(message, source, lineno, colno, e) {
+      //   handleError(e)
+      // }
+
       // run vanilla js
       // TODO: detect language from codemirror value, not React prop
       if (language == 'javascript') {
@@ -236,6 +257,7 @@ var CodeEditor = React.createClass({
         try {
           var res = eval(code);
           endJob({}, res);
+          cleanup()
         } catch(e) {
           handleError(e);
         } finally {
@@ -248,14 +270,6 @@ var CodeEditor = React.createClass({
         comp.setState({execution: 'loading webppl'})
         return wait(250, job);
       }
-
-      // inject this component's side effect methods into global
-      var sideEffectMethods = ['print'];
-      _.each(sideEffectMethods,
-             function(name) { global[name] = comp[name]; });
-      // note: React automatically binds methods to their class so we don't need to use .bind here
-
-      globalExport['makeResultContainer'] = comp['makeResultContainer'];
 
       comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
 
