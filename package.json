@@ -14,7 +14,7 @@
     "codemirror": "^5.13.4",
     "jquery": "^2.1.4",
     "react": "^15.0.1",
-    "react-codemirror": "^0.2.6",
+    "react-codemirror": "JedWatson/react-codemirror#5d5d1cd",
     "react-dom": "^15.0.1",
     "underscore": "^1.8.3"
   },
