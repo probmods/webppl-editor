@@ -13,9 +13,9 @@
     "babelify": "^7.2.0",
     "codemirror": "^5.13.4",
     "jquery": "^2.1.4",
-    "react": "^15.0.1",
+    "react": "^15.1.0",
     "react-codemirror": "JedWatson/react-codemirror#5d5d1cd",
-    "react-dom": "^15.0.1",
+    "react-dom": "^15.1.0",
     "underscore": "^1.8.3"
   },
   "devDependencies": {
