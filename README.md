@@ -23,7 +23,7 @@ preEls.map(function(el) { wpEditor.setup(el, {language: 'webppl'}); });
 </html>
 ```
 
-The library provides these functions in the global namespace:
+`webppl-editor` installs these functions in the global namespace:
 
 - `wpEditor.setup()`: converts a DOM element into an editor
 - `wpEditor.makeResultContainer()`: used to insert custom output into the results section of the editor
@@ -32,6 +32,8 @@ The library provides these functions in the global namespace:
 - `wpEditor.MCMCProgress()`: displays a progress bar during MCMC inference (work in progress).
 - `print` prints an object the results section (works both in WebPPL and vanilla Javascript).
 - `resumeTrampoline`: resumes trampolining WebPPL code; used for external library functions that need to do asynchronous work.
+
+We also ship the editor as `wpEditor.ReactComponent`.
 
 Development:
 

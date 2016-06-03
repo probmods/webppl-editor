@@ -1,15 +1,14 @@
 'use strict';
 
 var $ = require('jquery');
-
 var _ = require('underscore');
 
 var React = require('react');
 var ReactDOM = require('react-dom');
+
 var CodeMirror = require('codemirror');
 var CodeMirrorComponent = require('react-codemirror');
 var Folding = require('./folding')(CodeMirror);
-
 require('codemirror/addon/edit/matchbrackets');
 require('codemirror/addon/edit/closebrackets');
 require('codemirror/mode/javascript/javascript');
@@ -217,7 +216,7 @@ var CodeEditor = React.createClass({
       global['print'] = null;
       global['resumeTrampoline'] = null;
       global['onerror'] = null;
-      globalExport['makeResultContainer'] = null;
+      wpEditor['makeResultContainer'] = null;
       comp.setState({execution: 'idle'});
 
       // remove completed job
@@ -244,7 +243,7 @@ var CodeEditor = React.createClass({
              function(name) { global[name] = comp[name]; });
       // note: React automatically binds methods to their class so we don't need to use .bind here
 
-      globalExport['makeResultContainer'] = comp['makeResultContainer'];
+      wpEditor['makeResultContainer'] = comp['makeResultContainer'];
       // for catching errors in library code like wpEditor.get()
       global.onerror = function(message, source, lineno, colno, e) {
         // TODO: if e is not available, also use source, lineno, and colno
@@ -406,11 +405,12 @@ var setupCode = function(preEl, options) {
 var numTopStoreKeys = 0;
 
 var topStore = {};
-var globalExport = {
+var wpEditor = {
   setup: setupCode,
+  ReactComponent: CodeEditor,
   makeResultContainer: function() {}, // this gets set by a CodeEditor instance
   MCMCProgress: function() {
-    var container = globalExport['makeResultContainer'](),
+    var container = wpEditor['makeResultContainer'](),
         $container = $(container).addClass('progress'),
         $fill = $('<div>').addClass('fill'),
         $text = $('<div>').addClass('text');
@@ -447,7 +447,7 @@ var globalExport = {
       key = 'r' + numTopStoreKeys;
     }
     topStore[key] = item;
-    var div = globalExport.makeResultContainer();
+    var div = wpEditor.makeResultContainer();
     $(div).html('Stored item with key <span style="border: 1px solid gray; background-color: #dddddd; border-radius: 5px; padding: 0em 0.5em">' + key + '</b>').css({
       'font-size': '12px',
       'padding': '2px'
@@ -467,6 +467,4 @@ var globalExport = {
   }
 }
 
-global.CodeEditor = CodeEditor;
-
-global.wpEditor = globalExport;
+global.wpEditor = wpEditor;
