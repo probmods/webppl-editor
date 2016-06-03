@@ -41973,7 +41973,6 @@ var CodeEditor = React.createClass({
 
   getInitialState: function () {
     return {
-      code: this.props.code,
       results: [],
       newborn: true,
       execution: 'idle'
@@ -41985,6 +41984,13 @@ var CodeEditor = React.createClass({
   // TODO: remove hist and barChart once webppl-viz stabilizes
   // ------------------------------------------------------------
   print: function (s, k, a, x) {
+    // make print work as a regular js function
+    if (arguments.length == 1) {
+      this.addResult({ type: 'text',
+        message: typeof x == 'object' ? JSON.stringify(arguments[0]) : arguments[0] });
+      return;
+    }
+
     // if x has a custom printer, use it
     if (x.__print__) {
       return k(s, x.__print__(x));
@@ -42033,7 +42039,7 @@ var CodeEditor = React.createClass({
     this.setState({ newborn: false, results: [] });
 
     var comp = this;
-    var code = comp.state.code;
+    var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
 
     var endJob = function (store, returnValue) {
@@ -42045,7 +42051,10 @@ var CodeEditor = React.createClass({
     this.endJob = endJob;
 
     var cleanup = function () {
+      global['print'] = null;
       global['resumeTrampoline'] = null;
+      global['onerror'] = null;
+      globalExport['makeResultContainer'] = null;
       comp.setState({ execution: 'idle' });
 
       // remove completed job
@@ -42066,6 +42075,20 @@ var CodeEditor = React.createClass({
 
     var job = function () {
 
+      // inject this component's side effect methods into global
+      var sideEffectMethods = ['print'];
+      _.each(sideEffectMethods, function (name) {
+        global[name] = comp[name];
+      });
+      // note: React automatically binds methods to their class so we don't need to use .bind here
+
+      globalExport['makeResultContainer'] = comp['makeResultContainer'];
+      // for catching errors in library code like wpEditor.get()
+      global.onerror = function (message, source, lineno, colno, e) {
+        // TODO: if e is not available, also use source, lineno, and colno
+        handleError(e || message);
+      };
+
       // run vanilla js
       // TODO: detect language from codemirror value, not React prop
       if (language == 'javascript') {
@@ -42073,6 +42096,7 @@ var CodeEditor = React.createClass({
         try {
           var res = eval(code);
           endJob({}, res);
+          cleanup();
         } catch (e) {
           handleError(e);
         } finally {
@@ -42085,15 +42109,6 @@ var CodeEditor = React.createClass({
         comp.setState({ execution: 'loading webppl' });
         return wait(250, job);
       }
-
-      // inject this component's side effect methods into global
-      var sideEffectMethods = ['print'];
-      _.each(sideEffectMethods, function (name) {
-        global[name] = comp[name];
-      });
-      // note: React automatically binds methods to their class so we don't need to use .bind here
-
-      globalExport['makeResultContainer'] = comp['makeResultContainer'];
 
       comp.setState({ execution: compileCache[code] ? 'running' : 'compiling' });
 
@@ -42128,11 +42143,6 @@ var CodeEditor = React.createClass({
       job();
     }
   },
-  updateCode: function (newCode) {
-    this.setState({
-      code: newCode
-    });
-  },
   addResult: function (result) {
     // discovered alternate form of setState on my own
     // but later stumbled on a good explanation of why we need it at
@@ -42142,9 +42152,8 @@ var CodeEditor = React.createClass({
     });
   },
   render: function () {
-
     var comp = this;
-
+    // TODO: allow configuring this
     var options = {
       mode: 'javascript',
       lineNumbers: false,
@@ -42170,12 +42179,14 @@ var CodeEditor = React.createClass({
       }
     };
 
+    var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
+
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return React.createElement(
       'div',
       { ref: 'cont', className: 'wpedit' },
-      React.createElement(CodeMirrorComponent, { ref: 'editor', value: this.state.code, onChange: this.updateCode, options: options, codeMirrorInstance: CodeMirror }),
+      React.createElement(CodeMirrorComponent, { ref: 'editor', value: code, options: options, codeMirrorInstance: CodeMirror }),
       React.createElement(RunButton, { status: this.state.execution, clickHandler: this.runCode }),
       React.createElement(
         'button',
