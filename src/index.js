@@ -467,4 +467,14 @@ var wpEditor = {
   }
 }
 
-global.wpEditor = wpEditor;
+// behave both as a browser library and a node module
+// (HT underscore library)
+var root = this;
+if (typeof exports !== 'undefined') {
+  if (typeof module !== 'undefined' && module.exports) {
+    exports = module.exports = wpEditor;
+  }
+  exports.wpEditor = wpEditor;
+} else {
+  root.wpEditor = wpEditor;
+}
