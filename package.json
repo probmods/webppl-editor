@@ -7,10 +7,8 @@
     "type": "git",
     "url": "https://github.com/probmods/webppl-editor"
   },
-  {
-    "browserify": {
+  "browserify": {
       "transform": [["babelify", { "presets": ["react"] }]]
-    }
   },
   "browserify-shim": {},
   "dependencies": {
