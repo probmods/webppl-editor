@@ -23,15 +23,15 @@ preEls.map(function(el) { wpEditor.setup(el, {language: 'webppl'}); });
 </html>
 ```
 
-The library installs a single object, `wpEditor`, into the global namespace. `wpEditor` contains these methods:
+The library provides these functions in the global namespace:
 
-- `setup`: a function for turning a DOM element into an editor
-- `makeResultContainer`: a function used to insert custom objects into the results part of the editor
-- `put([key,] object)`: used for working across multiple code boxes. Stores an object (using an optional key) for use in other code boxes. If no key is specified, you'll get an automatically generated one.
-- `get([key])`: retrieves the object with key `key`. When called with no key, returns the entire store.
-- `MCMCProgress()`: displays a progress bar during MCMC inference (work in progress).
-
-The library also provides a function `resumeTrampoline` for external library functions that need to do asynchronous work.
+- `wpEditor.setup()`: converts a DOM element into an editor
+- `wpEditor.makeResultContainer()`: used to insert custom output into the results section of the editor
+- `wpEditor.put([key,] object)`: supports working across multiple code boxes. Stores an object (using an optional key) for use in other code boxes. If no key is specified, you'll get an automatically generated one.
+- `wpEditor.get([key])`: retrieves the object with key `key`. When called with no key, returns the entire store.
+- `wpEditor.MCMCProgress()`: displays a progress bar during MCMC inference (work in progress).
+- `print` prints an object the results section (works both in WebPPL and vanilla Javascript).
+- `resumeTrampoline`: resumes trampolining WebPPL code; used for external library functions that need to do asynchronous work.
 
 Development:
 
