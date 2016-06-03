@@ -10,7 +10,6 @@
   {
   "browserify": {
     "transform": [["babelify", { "presets": ["react"] }]]
-  }
   },
   "browserify-shim": {},
   "dependencies": {
