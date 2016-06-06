@@ -43,11 +43,25 @@ var x = sum(repeat(1e5, flip))
 tricky
 print('ended')</code></pre>
 
+      <b>nested reference error</b>:
+      <pre><code>var a = function () {
+    return {a:1}[notDefinedVariable]
+}
+return a()</code></pre>
+
+      <b>header error</b>:
+      <pre><code>map('not a function', [0])</code></pre>
+
       <b>throwing strings</b>:
       <pre><code>print('started');
 var x = sum(repeat(1e5, flip))
 window.throwString();
 print('ended')</code></pre>
+
+      <b>external library error</b>:
+      <pre><code>var posterior = wpEditor.get('foo');
+posterior
+      </code></pre>
 
       <b>MCMC callback:</b>
       <pre><code>var model = function() { return gaussian(0,1) };
