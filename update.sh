@@ -1,3 +1,3 @@
 #!/bin/bash
 
-rsync -rL ../wp-editor/demo/ .
+rsync -rL ../editor/demo/ .
