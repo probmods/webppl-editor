@@ -1,3 +1,7 @@
+.CodeMirrorError {
+    background-color: red;
+}
+
 .wpedit {
     font-family: Menlo, Courier;
 }

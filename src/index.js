@@ -14,6 +14,10 @@ require('codemirror/addon/edit/closebrackets');
 require('codemirror/mode/javascript/javascript');
 require('codemirror/addon/comment/comment'); // installs toggleComment
 
+var SourceMap = require('source-map');
+var stackTrace = require('stack-trace');
+
+
 var renderReturnValue = function(x) {
   if (x === undefined) {
     return ''
@@ -32,6 +36,56 @@ var renderReturnValue = function(x) {
 
   return JSON.stringify(x);
 };
+
+function addSourceMap(error, sourceMap) {
+  if (error instanceof Error) {
+    if (error.sourceMaps === undefined) {
+      error.sourceMaps = [];
+    }
+    error.sourceMaps.push(sourceMap);
+  }
+}
+
+function getErrorPosition(error) {
+
+  if (!(error instanceof Error)) {
+    return null;
+  }
+
+  var parsedError = stackTrace.parse(error);
+  // NB: this differs from core webppl; here, we want to highlight the nearest place
+  // of responsibility in the user's code.
+  var firstStackFrame = _.findWhere(parsedError, {fileName: '<anonymous>'});
+  // Switch from 1 to 0 indexed.
+  firstStackFrame.columnNumber--;
+  firstStackFrame.sourceMapped = false;
+
+  if (error.sourceMaps === undefined || firstStackFrame.native) {
+    return firstStackFrame;
+  }
+
+  // Check whether the error occurred in compiled code. We only need
+  // to check the first source map as this is the one added when the
+  // error was first caught.
+
+  var mapConsumer = new SourceMap.SourceMapConsumer(error.sourceMaps[0]);
+  var originalPosition = mapConsumer.originalPositionFor({
+    line: firstStackFrame.lineNumber,
+    column: firstStackFrame.columnNumber
+  });
+
+  if (originalPosition.source === null) {
+    return firstStackFrame;
+  } else {
+    return {
+      fileName: originalPosition.source,
+      lineNumber: originalPosition.line,
+      columnNumber: originalPosition.column,
+      sourceMapped: true
+    };
+  }
+}
+
 
 var ResultError = React.createClass({
   getInitialState: function() {
@@ -245,9 +299,13 @@ var CodeEditor = React.createClass({
 
       wpEditor['makeResultContainer'] = comp['makeResultContainer'];
       // for catching errors in library code like wpEditor.get()
+
+      var handleRunError;
+
       global.onerror = function(message, source, lineno, colno, e) {
+        console.log('global.onerror triggered')
         // TODO: if e is not available, also use source, lineno, and colno
-        handleError(e || message)
+        handleRunError(e || message)
       }
 
       // run vanilla js
@@ -278,7 +336,7 @@ var CodeEditor = React.createClass({
         // compile code if we need to
         if (!compileCache[code]) {
           try {
-            compileCache[code] = webppl.compile(code)
+            compileCache[code] = webppl.compile(code, {sourceMap: true})
           } catch (e) {
             handleError(e);
           }
@@ -286,12 +344,30 @@ var CodeEditor = React.createClass({
 
         comp.setState({execution: 'running'});
 
-        var runner = util.trampolineRunners.web(handleError);
+        var sourceMap = compileCache[code].map;
+        handleRunError = function(e) {
+          addSourceMap(e, sourceMap);
+          var pos = getErrorPosition(e);
+          if (!pos) {
+            return handleError(e)
+          };
+          var lineNumber = pos.lineNumber - 1,
+              columnNumber = pos.columnNumber;
+          var cm = comp.refs.editor.getCodeMirror();
+
+          cm.markText({line: lineNumber, ch: columnNumber},
+                      // TODO: add ending column number
+                      {line: lineNumber, ch: Infinity},
+                      {className: "CodeMirrorError", clearOnEnter: true});
+          handleError(e);
+        }
+
+        var runner = util.trampolineRunners.web(handleRunError);
         global['resumeTrampoline'] = runner;
         comp.runner = runner;
 
         wait(20, function() {
-          var _code = eval.call({}, compileCache[code])(runner);
+          var _code = eval.call({}, compileCache[code].code)(runner);
           _code({}, endJob, '');
         });
 
