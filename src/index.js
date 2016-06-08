@@ -80,6 +80,7 @@ function getErrorPosition(error) {
     return {
       fileName: originalPosition.source,
       lineNumber: originalPosition.line,
+      identifier: originalPosition.name,
       columnNumber: originalPosition.column,
       sourceMapped: true
     };
@@ -355,9 +356,11 @@ var CodeEditor = React.createClass({
               columnNumber = pos.columnNumber;
           var cm = comp.refs.editor.getCodeMirror();
 
+          var endColumn = pos.identifier ? columnNumber + pos.identifier.length : Infinity;
+
           cm.markText({line: lineNumber, ch: columnNumber},
                       // TODO: add ending column number
-                      {line: lineNumber, ch: Infinity},
+                      {line: lineNumber, ch: endColumn},
                       {className: "CodeMirrorError", clearOnEnter: true});
           handleError(e);
         }
