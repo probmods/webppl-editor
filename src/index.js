@@ -227,7 +227,7 @@ var CodeEditor = React.createClass({
   },
   // ------------------------------------------------------------
   cancelRun: function() {
-    this.runner.__cancel__ = true;
+    if (this.runner) { this.runner.__cancel__ = true; }
     this.addResult({type: 'text', message: '[Execution canceled]'});
     this.endJob();
   },
@@ -340,6 +340,7 @@ var CodeEditor = React.createClass({
             compileCache[code] = webppl.compile(code, {sourceMap: true})
           } catch (e) {
             handleError(e);
+            return;
           }
         }
 
