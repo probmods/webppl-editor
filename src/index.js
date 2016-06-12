@@ -555,7 +555,6 @@ if (typeof exports !== 'undefined') {
   if (typeof module !== 'undefined' && module.exports) {
     exports = module.exports = wpEditor;
   }
-  exports.wpEditor = wpEditor;
 }
 
 if (typeof window !== 'undefined') {
