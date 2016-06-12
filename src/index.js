@@ -386,6 +386,9 @@ var CodeEditor = React.createClass({
       job()
     }
   },
+  getCode: function() {
+    return this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
+  },
   addResult: function(result) {
     // discovered alternate form of setState on my own
     // but later stumbled on a good explanation of why we need it at
