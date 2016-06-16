@@ -1,3 +1,5 @@
+span.CodeMirror-nonmatchingbracket {color: #f22;}
+
 .CodeMirrorError {
     background-color: red;
 }
