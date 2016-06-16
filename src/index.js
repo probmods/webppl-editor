@@ -56,6 +56,15 @@ function getErrorPosition(error) {
   // NB: this differs from core webppl; here, we want to highlight the nearest place
   // of responsibility in the user's code.
   var firstStackFrame = _.findWhere(parsedError, {fileName: '<anonymous>'});
+
+  // if error occurred in library code, identify it in the message but don't highlight
+  // anything
+  if (!firstStackFrame) {
+    var file = _.last(parsedError[0].fileName.split("/"));
+    error.message = "Error in " + file + ": " + error.message
+    return null;
+  }
+
   // Switch from 1 to 0 indexed.
   firstStackFrame.columnNumber--;
   firstStackFrame.sourceMapped = false;
