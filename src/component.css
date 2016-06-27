@@ -66,6 +66,7 @@ span.CodeMirror-nonmatchingbracket {color: #f22;}
 
 .wpedit button:disabled {
     cursor: auto;
+    color: gray;
 }
 
 
