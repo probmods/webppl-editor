@@ -5,21 +5,6 @@ var open = require('open');
 var child_process = require('child_process');
 var fs = require('fs');
 
-var jslintSettings = {
-  options: {
-    flags: ['--flagfile .gjslintrc'],
-    reporter: {
-      name: 'console'
-    },
-    force: false
-  },
-  lib: {
-    src: [
-      'Gruntfile.js',
-      'src/*.js',
-    ]
-  }
-};
 module.exports = function(grunt) {
   grunt.initConfig({
     subgrunt: {
@@ -27,36 +12,6 @@ module.exports = function(grunt) {
         'node_modules/webppl': 'browserify'
       }
     },
-    nodeunit: {
-      all: ['tests/test-*.js']
-    },
-    jshint: {
-      files: [
-        'Gruntfile.js',
-        'src/*.js'
-      ],
-      options: {
-        maxerr: 500,
-        camelcase: true,
-        nonew: true,
-        curly: true,
-        noarg: true,
-        trailing: true,
-        forin: true,
-        noempty: true,
-        node: true,
-        eqeqeq: true,
-        strict: false,
-        evil: true,
-        undef: true,
-        bitwise: true,
-        browser: true,
-        gcl: true,
-        newcap: false
-      }
-    },
-    gjslint: jslintSettings,
-    fixjsstyle: jslintSettings,
     clean: ['bundle/*.js'],
     watch: {
       ad: {
@@ -71,18 +26,10 @@ module.exports = function(grunt) {
   }
 
   grunt.loadNpmTasks('grunt-subgrunt');
-  grunt.loadNpmTasks('grunt-gjslint');
-  grunt.loadNpmTasks('grunt-contrib-jshint');
-  grunt.loadNpmTasks('grunt-contrib-nodeunit');
   grunt.loadNpmTasks('grunt-contrib-clean');
   grunt.loadNpmTasks('grunt-contrib-watch');
 
-  grunt.registerTask('default', ['gjslint', 'nodeunit']);
-  grunt.registerTask('test', ['nodeunit']);
-  grunt.registerTask('lint', ['gjslint']);
-  grunt.registerTask('hint', ['jshint']);
-  grunt.registerTask('fixstyle', ['fixjsstyle']);
-
+  grunt.registerTask('default', ['browserify']);
 
 
   grunt.registerTask('bundle', 'Create browser bundle (= css + browserify + uglify)', function() {
@@ -106,7 +53,6 @@ module.exports = function(grunt) {
     grunt.task.run('subgrunt:webppl')
     grunt.task.run('copy-webppl')
   });
-
 
   grunt.registerTask('browserify', 'Generate "bundle/webppl-editor.js".', function() {
     child_process.execSync('mkdir -p bundle');
