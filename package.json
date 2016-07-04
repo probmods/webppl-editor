@@ -46,7 +46,7 @@
     "open": "0.0.5",
     "through": "^2.3.8",
     "watchify": "^3.6.1",
-    "webppl": "probmods/webppl#24be2446c7bafb2eff376838874fd98628f6e2e5"
+    "webppl": "probmods/webppl#20a0c37ff27387944f36fd2fd8b9458dc97abef7"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
