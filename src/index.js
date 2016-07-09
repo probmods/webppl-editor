@@ -122,8 +122,24 @@ var pureSCU = function(nextProps, nextState) {
 var ResultText = React.createClass({
   shouldComponentUpdate: pureSCU,
   render: function() {
-    return (
-        <pre key={this.props._key} className='text'>{this.props.message + ''}</pre>
+    var subtype = this.props.subtype || "log";
+    var icon = {
+      log: "",
+      warn: "⚠",
+      error: "x",
+      info: "i"
+    }[this.props.subtype || "log"];
+
+    var spanClass='icon ' + subtype;
+
+    var count = this.props.count == 1 || this.props.count === undefined ? "" : "(" + this.props.count + ") ";
+    var message = this.props.message;
+
+    return (<div>
+            <span className={spanClass}>{icon}</span>
+            <span className='count'>{count}</span>
+            <pre key={this.props._key} className='text'>{message}</pre>
+            </div>
     );
   }
 });
@@ -206,7 +222,6 @@ var CodeEditor = React.createClass({
   // side effects
   // these methods draw to the results div of a particular CodeEditor instance
   // the actively running codebox will inject them into global once it starts running
-  // TODO: remove hist and barChart once webppl-viz stabilizes
   // ------------------------------------------------------------
   print: function(s,k,a,x) {
     // make print work as a regular js function
@@ -276,7 +291,11 @@ var CodeEditor = React.createClass({
 
     this.endJob = endJob;
 
+    // TODO: incorporate this into the other side effect stuff
+    var nativeConsole = console;
+
     var cleanup = function() {
+      global['console'] = nativeConsole;
       global['print'] = null;
       global['resumeTrampoline'] = null;
       global['onerror'] = null;
@@ -300,6 +319,39 @@ var CodeEditor = React.createClass({
     }
 
     var job = function() {
+      // TODO: incorporate this into the other side effect stuff
+      // NB: doing, e.g., nativeConsole.log.apply doesn't work
+      // HT http://stackoverflow.com/a/9521992/351392
+
+      var lastMessages = {};
+      var makeConsoleMethod = function(subtype) {
+        return function() {
+          var args = _.toArray(arguments);
+          var message = args.join(' ');
+          var lastMessage = lastMessages[subtype];
+
+          if (lastMessage == message) {
+            comp.setState(function(state, props) {
+              // TODO: is mutating state okay?
+              var idx = _.findLastIndex(state.results,
+                                        function(res) { return res.subtype == subtype});
+              state.results[idx].count += 1;
+              return state;
+            })
+          } else {
+            comp.addResult({type: 'text', subtype: subtype, message: message, count: 1});
+            lastMessages[subtype] = message;
+            nativeConsole[subtype](message);
+          }
+        }
+      }
+
+      global['console'] = {
+        log: makeConsoleMethod('log'),
+        info: makeConsoleMethod('info'),
+        warn: makeConsoleMethod('warn'),
+        error: makeConsoleMethod('error')
+      };
 
       // inject this component's side effect methods into global
       var sideEffectMethods = ['print'];

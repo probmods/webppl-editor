@@ -40,6 +40,18 @@
       <b>scratch pad</b>:
       <pre id="ed-scratch"><code></code></pre>
 
+      <b>intercept console methods</b>:
+      <pre><code>console.log("log")
+console.info("info")
+console.warn("warning")
+console.error("error")
+
+var as = repeat(100, function() { beta(0.001, 0.001) });
+util.warn("foo");
+var bs = repeat(100, function() { beta(0.001, 0.001) });
+
+3</code></pre>
+
       <b>compile error</b>:
       <pre><code>flip(</code></pre>
 
