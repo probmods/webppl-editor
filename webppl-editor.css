@@ -1,3 +1,5 @@
+span.CodeMirror-nonmatchingbracket {color: #f22;}
+
 .CodeMirrorError {
     background-color: red;
 }
@@ -64,6 +66,7 @@
 
 .wpedit button:disabled {
     cursor: auto;
+    color: gray;
 }
 
 
@@ -72,6 +75,7 @@
     border-radius: 2px;
     margin: 0.5em 0;
     min-height: 0.5em;
+    overflow-x: scroll;
 }
 
 .wpedit .result pre {
@@ -121,6 +125,36 @@
 
 .wpedit .hidden {
     display: none;
+}
+
+.result .icon {
+    border-radius: 5px;
+    padding: 0 3px;
+    float: left;
+    color: white;
+    margin: 4px 2px 0px 2px;
+    font-size: 12px;
+}
+
+.icon.warn {
+    background-color: orange;
+    color: black
+}
+
+.icon.info {
+    background-color: #2387d2;
+}
+
+.icon.error {
+    background-color: red;
+}
+
+.result .count:not(:empty) {
+    font-family: Helvetica;
+    font-size: 10px;
+    float: left;
+    margin: 5px;
+    color: gray
 }
 /* BASICS */
 
@@ -212,8 +246,14 @@
 
 .cm-tab { display: inline-block; text-decoration: inherit; }
 
+.CodeMirror-rulers {
+  position: absolute;
+  left: 0; right: 0; top: -50px; bottom: -20px;
+  overflow: hidden;
+}
 .CodeMirror-ruler {
   border-left: 1px solid #ccc;
+  top: 0; bottom: 0;
   position: absolute;
 }
 
@@ -415,7 +455,10 @@ div.CodeMirror span.CodeMirror-nonmatchingbracket {color: #f22;}
   visibility: hidden;
 }
 
-.CodeMirror-cursor { position: absolute; }
+.CodeMirror-cursor {
+  position: absolute;
+  pointer-events: none;
+}
 .CodeMirror-measure pre { position: static; }
 
 div.CodeMirror-cursors {
