@@ -37,6 +37,9 @@
   </head>
   <body>
     <div id="wrapper">
+      <b>scratch pad</b>:
+      <pre id="ed-scratch"><code></code></pre>
+
       <b>compile error</b>:
       <pre><code>flip(</code></pre>
 
@@ -1702,29 +1705,35 @@ globalStore["x"] = 1 + 1;
 globalStore["x"] = 1 + 1;
 globalStore["x"] = 1 + 1;
       </code></pre>
-
     </div>
-
-
-
   </body>
   <script>
    var getLanguage = function(code){
        var firstLine = code.split("\n")[0];
-    if (firstLine == "// language: javascript") {
-      return "javascript";
-    } else {
-      return "webppl";
-    }
-  };
-
-   $("pre").map(function(i,el) {
-       wpEditor.setup(el, {language: getLanguage($(el).text())})
-   })
-
-       var throwString = function() {
-           throw 'string error'
+       if (firstLine == "// language: javascript") {
+           return "javascript";
+       } else {
+           return "webppl";
        }
+   };
+
+   // load scratch pad contents
+
+   $("#ed-scratch code").text(localStorage.getItem('ed-scratch'));
+
+   var scratchComp;
+   $("pre").map(function(i,el) {
+       var comp = wpEditor.setup(el, {language: getLanguage($(el).text())});
+       if (el.id == 'ed-scratch') {
+           scratchComp = comp;
+       }
+   });
+
+   // save scratch pad contents
+
+   window.onbeforeunload = function() { localStorage.setItem('ed-scratch', scratchComp.getCode()) }
+
+   var throwString = function() { throw 'string error' };
   </script>
 
   <script src="webppl.js" defer></script>
