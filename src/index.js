@@ -17,6 +17,9 @@ require('codemirror/addon/comment/comment'); // installs toggleComment
 var SourceMap = require('source-map');
 var stackTrace = require('stack-trace');
 
+var wait = function(ms, f) {
+  return setTimeout(f, ms);
+}
 
 var renderReturnValue = function(x) {
   if (x === undefined) {
@@ -96,7 +99,6 @@ function getErrorPosition(error) {
   }
 }
 
-
 var ResultError = React.createClass({
   getInitialState: function() {
     return {showStack: false}
@@ -144,10 +146,6 @@ var ResultText = React.createClass({
   }
 });
 
-var wait = function(ms,f) {
-  return setTimeout(f,ms);
-}
-
 var ResultDOM = React.createClass({
   componentDidMount: function() {
     this.div = ReactDOM.findDOMNode(this);
@@ -171,9 +169,6 @@ var RunButton = React.createClass({
     )
   }
 });
-
-var jobsQueue = [];
-var compileCache = {};
 
 var ResultList = React.createClass({
   getInitialState: function() {
@@ -210,6 +205,7 @@ var ResultList = React.createClass({
   }
 })
 
+var jobsQueue = [], compileCache = {};
 
 var CodeEditor = React.createClass({
   getInitialState: function() {
@@ -501,16 +497,11 @@ var setupCode = function(preEl, options) {
   // converts <pre><code>...</code></pre>
   // to a CodeMirror instance
 
-  options = _.defaults(
-    options || {},
-    {
-      trim: true,
-      language: 'webppl'
-    }
-  );
+  options = _.defaults(options || {}, {trim: true,
+                                       language: 'webppl'
+                                      });
 
   var parentDiv = preEl.parentNode;
-
   var editorDiv = document.createElement('div');
 
   var code = $(preEl).text();
@@ -518,10 +509,9 @@ var setupCode = function(preEl, options) {
     code = code.trim()
   }
 
-  var r = React.createElement(
-    CodeEditor,
-    {code: code,
-     language: options.language});
+  var r = React.createElement(CodeEditor,
+                              {code: code,
+                               language: options.language});
 
   // TODO: figure out if this is an anti-pattern
   var ret = {};
@@ -531,7 +521,6 @@ var setupCode = function(preEl, options) {
     var comp = this;
 
     requestAnimationFrame(function() {
-
       var cm = comp.refs['editor'].getCodeMirror();
 
       parentDiv.replaceChild(editorDiv, preEl);
@@ -550,9 +539,9 @@ var setupCode = function(preEl, options) {
   return ret;
 };
 
+var topStore = {};
 var numTopStoreKeys = 0;
 
-var topStore = {};
 var wpEditor = {
   setup: setupCode,
   ReactComponent: CodeEditor,
