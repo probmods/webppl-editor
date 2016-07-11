@@ -170,11 +170,28 @@ var RunButton = React.createClass({
   }
 });
 
+var ResultMetaDrawer = React.createClass({
+  render: function() {
+    var items = _.values(_.mapObject(_.omit(this.props, 'visible'),
+                                     function(v,k) {
+                                       return <div key={k}><b>{k}</b>: {v}</div>
+                                     }));
+
+    return (<div className={'meta ' + (this.props.visible ? '' : 'hide')}>
+            {items}
+            </div>)
+  }
+})
+
 var ResultList = React.createClass({
   getInitialState: function() {
     return {
+      metaVisible: false,
       minHeight: 0
     }
+  },
+  showMetaDrawer: function() {
+    this.setState({metaVisible: !this.state.metaVisible})
   },
   render: function() {
     var renderResult = function(d,k) {
@@ -198,7 +215,16 @@ var ResultList = React.createClass({
       minHeight: this.state.minHeight
     }
 
-    return (<div style={style} className={this.props.newborn ? 'result hide' : 'result'}>
+    var webpplVersion = this.props.webpplVersion;
+    var seed = this.props.seed;
+
+    return (<div style={style} className={'result ' + (this.props.newborn ? 'hide' : '')}>
+            <span className="drawerButton" onClick={this.showMetaDrawer}>☰</span>
+            <ResultMetaDrawer
+            visible={this.state.metaVisible}
+            webppl={webpplVersion}
+            seed={seed}
+            />
             {list}
             </div>);
 
@@ -427,6 +453,10 @@ var CodeEditor = React.createClass({
         global['resumeTrampoline'] = runner;
         comp.runner = runner;
 
+        var newSeed = _.now();
+        util.seedRNG(newSeed);
+        comp.setState({seed: newSeed});
+
         wait(20, function() {
           var _code = eval.call({}, compileCache[code].code)(runner);
           _code({}, endJob, '');
@@ -474,6 +504,8 @@ var CodeEditor = React.createClass({
       }
     };
 
+    var webpplVersion = global.webppl ? global.webppl.version : '';
+
     var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
 
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
@@ -487,7 +519,12 @@ var CodeEditor = React.createClass({
                              codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
-        <ResultList newborn={this.state.newborn} ref='resultList' executionState={this.state.execution} list={this.state.results} />
+        <ResultList ref='resultList'
+                    newborn={this.state.newborn}
+                    executionState={this.state.execution}
+                    list={this.state.results}
+                    seed={this.state.seed}
+                    webpplVersion={webpplVersion} />
         </div>
     );
   }
