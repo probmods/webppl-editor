@@ -656,4 +656,5 @@ if (typeof exports !== 'undefined') {
 
 if (typeof window !== 'undefined') {
   window.wpEditor = wpEditor;
+  window.editor = wpEditor;
 }
