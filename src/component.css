@@ -98,7 +98,8 @@ span.CodeMirror-nonmatchingbracket {color: #f22;}
     margin: 0.5em 0;
     min-height: 0.5em;
     overflow-x: scroll;
-    position: relative
+    position: relative;
+    max-height: 600px; /* todo: figure out why a percentage doesn't work here */
 }
 
 .wpedit .result pre {
