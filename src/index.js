@@ -193,10 +193,18 @@ var ResultList = React.createClass({
   showMetaDrawer: function() {
     this.setState({metaVisible: !this.state.metaVisible})
   },
-  componentDidUpdate: function() {
-    // scroll to bottom
+  // auto scroll to bottom (if user is already at the bottom)
+  // HT http://blog.vjeux.com/2013/javascript/scroll-position-with-react.html
+  componentWillUpdate: function() {
     var node = ReactDOM.findDOMNode(this);
-    node.scrollTop = node.scrollHeight;
+    // 4 is a fudge factor
+    this.shouldScrollBottom = node.scrollHeight - (node.scrollTop + node.offsetHeight) < 4;
+  },
+  componentDidUpdate: function() {
+    if (this.shouldScrollBottom) {
+      var node = ReactDOM.findDOMNode(this);
+      node.scrollTop = node.scrollHeight
+    }
   },
   render: function() {
     var renderResult = function(d,k) {
@@ -225,7 +233,7 @@ var ResultList = React.createClass({
 
     return (<div style={style} className={'result ' + (this.props.newborn ? 'hide' : '')}>
             <span className="drawerButton" onClick={this.showMetaDrawer}>☰</span>
-            <ResultMetaDrawer
+        <ResultMetaDrawer
             visible={this.state.metaVisible}
             webppl={webpplVersion}
             seed={seed}
@@ -292,13 +300,7 @@ var CodeEditor = React.createClass({
     // of it shrinking because it's empty and growing again as
     // results populate
     resultList.setState(function(state,props) {
-      //return _.extend({}, state, {minHeight: $resultsDiv.height()})
-
-      return _.extend({}, state, {minHeight:
-            util.sum($resultsDiv.contents().map(function(i,x) {
-              return $(x).height()
-            }))
-      })
+      return _.extend({}, state, {minHeight: $resultsDiv.height()})
     })
 
     // enable only in dev mode
