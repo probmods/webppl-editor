@@ -193,6 +193,11 @@ var ResultList = React.createClass({
   showMetaDrawer: function() {
     this.setState({metaVisible: !this.state.metaVisible})
   },
+  componentDidUpdate: function() {
+    // scroll to bottom
+    var node = ReactDOM.findDOMNode(this);
+    node.scrollTop = node.scrollHeight;
+  },
   render: function() {
     var renderResult = function(d,k) {
       if (d.type == 'text') {
