@@ -1,3 +1,25 @@
+.meta {
+    position: absolute;
+    right: 0px;
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    font-size: 12px;
+    padding: 1em;
+    min-width: 200px;
+}
+
+.drawerButton {
+    position: absolute;
+    right: 0;
+    margin-right: 3px;
+    color: #ccc;
+    z-index: 120;
+}
+
+.drawerButton:hover {
+    cursor: pointer
+}
+
 span.CodeMirror-nonmatchingbracket {color: #f22;}
 
 .CodeMirrorError {
@@ -76,10 +98,13 @@ span.CodeMirror-nonmatchingbracket {color: #f22;}
     margin: 0.5em 0;
     min-height: 0.5em;
     overflow-x: scroll;
+    position: relative;
+    max-height: 600px; /* todo: figure out why a percentage doesn't work here */
 }
 
 .wpedit .result pre {
-    border: none
+    border: none;
+    white-space: pre-wrap;
 }
 
 .wpedit pre.error {

@@ -45536,6 +45536,10 @@ require('codemirror/addon/comment/comment'); // installs toggleComment
 var SourceMap = require('source-map');
 var stackTrace = require('stack-trace');
 
+var wait = function (ms, f) {
+  return setTimeout(f, ms);
+};
+
 var renderReturnValue = function (x) {
   if (x === undefined) {
     return '';
@@ -45657,10 +45661,6 @@ var ResultText = React.createClass({
   }
 });
 
-var wait = function (ms, f) {
-  return setTimeout(f, ms);
-};
-
 var ResultDOM = React.createClass({
   displayName: 'ResultDOM',
 
@@ -45687,16 +45687,42 @@ var RunButton = React.createClass({
   }
 });
 
-var jobsQueue = [];
-var compileCache = {};
+var ResultMetaDrawer = React.createClass({
+  displayName: 'ResultMetaDrawer',
+
+  render: function () {
+    var items = _.values(_.mapObject(_.omit(this.props, 'visible'), function (v, k) {
+      return React.createElement('div', { key: k }, React.createElement('b', null, k), ': ', v);
+    }));
+
+    return React.createElement('div', { className: 'meta ' + (this.props.visible ? '' : 'hide') }, items);
+  }
+});
 
 var ResultList = React.createClass({
   displayName: 'ResultList',
 
   getInitialState: function () {
     return {
+      metaVisible: false,
       minHeight: 0
     };
+  },
+  showMetaDrawer: function () {
+    this.setState({ metaVisible: !this.state.metaVisible });
+  },
+  // auto scroll to bottom (if user is already at the bottom)
+  // HT http://blog.vjeux.com/2013/javascript/scroll-position-with-react.html
+  componentWillUpdate: function () {
+    var node = ReactDOM.findDOMNode(this);
+    // 4 is a fudge factor
+    this.shouldScrollBottom = node.scrollHeight - (node.scrollTop + node.offsetHeight) < 4;
+  },
+  componentDidUpdate: function () {
+    if (this.shouldScrollBottom) {
+      var node = ReactDOM.findDOMNode(this);
+      node.scrollTop = node.scrollHeight;
+    }
   },
   render: function () {
     var renderResult = function (d, k) {
@@ -45722,9 +45748,19 @@ var ResultList = React.createClass({
       minHeight: this.state.minHeight
     };
 
-    return React.createElement('div', { style: style, className: this.props.newborn ? 'result hide' : 'result' }, list);
+    var webpplVersion = this.props.webpplVersion;
+    var seed = this.props.seed;
+
+    return React.createElement('div', { style: style, className: 'result ' + (this.props.newborn ? 'hide' : '') }, React.createElement('span', { className: 'drawerButton', onClick: this.showMetaDrawer }, '☰'), React.createElement(ResultMetaDrawer, {
+      visible: this.state.metaVisible,
+      webppl: webpplVersion,
+      seed: seed
+    }), list);
   }
 });
+
+var jobsQueue = [],
+    compileCache = {};
 
 var CodeEditor = React.createClass({
   displayName: 'CodeEditor',
@@ -45784,12 +45820,7 @@ var CodeEditor = React.createClass({
     // of it shrinking because it's empty and growing again as
     // results populate
     resultList.setState(function (state, props) {
-      //return _.extend({}, state, {minHeight: $resultsDiv.height()})
-
-      return _.extend({}, state, { minHeight: util.sum($resultsDiv.contents().map(function (i, x) {
-          return $(x).height();
-        }))
-      });
+      return _.extend({}, state, { minHeight: $resultsDiv.height() });
     });
 
     // enable only in dev mode
@@ -45950,6 +45981,10 @@ var CodeEditor = React.createClass({
         global['resumeTrampoline'] = runner;
         comp.runner = runner;
 
+        var newSeed = _.now();
+        util.seedRNG(newSeed);
+        comp.setState({ seed: newSeed });
+
         wait(20, function () {
           var _code = eval.call({}, compileCache[code].code)(runner);
           _code({}, endJob, '');
@@ -46003,6 +46038,8 @@ var CodeEditor = React.createClass({
       }
     };
 
+    var webpplVersion = global.webppl ? global.webppl.version : '';
+
     var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
 
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
@@ -46011,7 +46048,12 @@ var CodeEditor = React.createClass({
       value: code,
       options: options,
       onChange: comp.props.onChange,
-      codeMirrorInstance: CodeMirror }), React.createElement(RunButton, { status: this.state.execution, clickHandler: this.runCode }), React.createElement('button', { className: _.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide', onClick: this.cancelRun }, 'cancel'), React.createElement(ResultList, { newborn: this.state.newborn, ref: 'resultList', executionState: this.state.execution, list: this.state.results }));
+      codeMirrorInstance: CodeMirror }), React.createElement(RunButton, { status: this.state.execution, clickHandler: this.runCode }), React.createElement('button', { className: _.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide', onClick: this.cancelRun }, 'cancel'), React.createElement(ResultList, { ref: 'resultList',
+      newborn: this.state.newborn,
+      executionState: this.state.execution,
+      list: this.state.results,
+      seed: this.state.seed,
+      webpplVersion: webpplVersion }));
   }
 });
 
@@ -46019,13 +46061,11 @@ var setupCode = function (preEl, options) {
   // converts <pre><code>...</code></pre>
   // to a CodeMirror instance
 
-  options = _.defaults(options || {}, {
-    trim: true,
+  options = _.defaults(options || {}, { trim: true,
     language: 'webppl'
   });
 
   var parentDiv = preEl.parentNode;
-
   var editorDiv = document.createElement('div');
 
   var code = $(preEl).text();
@@ -46044,7 +46084,6 @@ var setupCode = function (preEl, options) {
     var comp = this;
 
     requestAnimationFrame(function () {
-
       var cm = comp.refs['editor'].getCodeMirror();
 
       parentDiv.replaceChild(editorDiv, preEl);
@@ -46065,9 +46104,9 @@ var setupCode = function (preEl, options) {
   return ret;
 };
 
+var topStore = {};
 var numTopStoreKeys = 0;
 
-var topStore = {};
 var wpEditor = {
   setup: setupCode,
   ReactComponent: CodeEditor,
@@ -46139,6 +46178,7 @@ if (typeof exports !== 'undefined') {
 
 if (typeof window !== 'undefined') {
   window.wpEditor = wpEditor;
+  window.editor = wpEditor;
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
