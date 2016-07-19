@@ -246,6 +246,8 @@ var ResultList = React.createClass({
 
 var jobsQueue = [], compileCache = {};
 
+var cachedCompile;
+
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
@@ -389,10 +391,10 @@ var CodeEditor = React.createClass({
       // note: React automatically binds methods to their class so we don't need to use .bind here
 
       wpEditor['makeResultContainer'] = comp['makeResultContainer'];
-      // for catching errors in library code like wpEditor.get()
 
       var handleRunError;
 
+      // for catching errors in library code like wpEditor.get()
       global.onerror = function(message, source, lineno, colno, e) {
         console.log('global.onerror triggered')
         // TODO: if e is not available, also use source, lineno, and colno
@@ -420,56 +422,58 @@ var CodeEditor = React.createClass({
         return wait(250, job);
       }
 
-      comp.setState({execution: compileCache[code] ? 'running' : 'compiling'});
+      comp.setState({execution: 'running'});
 
-      // use wait() so that runButton dom changes actually appear
-      wait(20, function() {
-        // compile code if we need to
-        if (!compileCache[code]) {
-          try {
-            compileCache[code] = webppl.compile(code, {sourceMap: true})
-          } catch (e) {
-            handleError(e);
-            return;
-          }
-        }
+      var runner = function() { debugger }//util.trampolineRunners.web();
 
-        comp.setState({execution: 'running'});
 
-        var sourceMap = compileCache[code].map;
-        handleRunError = function(e) {
-          addSourceMap(e, sourceMap);
-          var pos = getErrorPosition(e);
-          if (!pos) {
-            return handleError(e)
-          };
-          var lineNumber = pos.lineNumber - 1,
-              columnNumber = pos.columnNumber;
+      handleRunError = function(error) {
+        // For Chrome only...
+
+        // If debug=true is passed to run (as below), then wpplError is
+        // expected to be present when an instance of Error is thrown
+        // running the program
+
+        // This object holds information about the top-most position on the
+        // stack that originated from the user specific program.
+
+        if (error instanceof Error && error.wpplError) {
+
+          // We can use the following information for highlighting a
+          // suitable point in the user program.
+          var wpplError = error.wpplError,
+              lineNumber = wpplError.lineNumber - 1,
+              columnNumber = wpplError.columnNumber,
+              endColumn = wpplError.name ? columnNumber + wpplError.name.length : Infinity;
           var cm = comp.refs.editor.getCodeMirror();
-
-          var endColumn = pos.identifier ? columnNumber + pos.identifier.length : Infinity;
-
           cm.markText({line: lineNumber, ch: columnNumber},
-                      // TODO: add ending column number
                       {line: lineNumber, ch: endColumn},
                       {className: "CodeMirrorError", clearOnEnter: true});
-          handleError(e);
+
         }
 
-        var runner = util.trampolineRunners.web(handleRunError);
-        global['resumeTrampoline'] = runner;
-        comp.runner = runner;
+        handleError(error);
 
-        var newSeed = _.now();
-        util.seedRNG(newSeed);
-        comp.setState({seed: newSeed});
+      };
 
-        wait(20, function() {
-          var _code = eval.call({}, compileCache[code].code)(runner);
-          _code({}, endJob, '');
-        });
+      // Make a cached version of webppl's compile function. Passed to
+      // webppl.run below.
+      if (!cachedCompile) {
+        cachedCompile = _.memoize(webppl.compileBase);
+      }
+      global['resumeTrampoline'] = function() {
+        debugger;
+      };
 
-      });
+      wait(20, function() {
+        webppl.run(code,
+                   endJob,
+                   {errorHandlers: [handleRunError], debug: true, compile: cachedCompile, runner: runner})
+
+      })
+
+
+
 
     };
 

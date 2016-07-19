@@ -40,6 +40,12 @@
       <b>scratch pad</b>:
       <pre id="ed-scratch"><code></code></pre>
 
+      <b>address-based stack traces</b>:
+      <pre><code>Infer({method: 'MCMC', samples: 1e6}, function() {
+  return flip() + flip();
+})</code></pre>
+
+
       <b>todo: throttle floods of ResultList updates</b>
       <pre><code>repeat(1000, function() { console.log(uniform(0,1))})</code></pre>
 
@@ -1751,5 +1757,6 @@ globalStore["x"] = 1 + 1;
    var throwString = function() { throw 'string error' };
   </script>
 
-  <script src="//s3-us-west-2.amazonaws.com/cdn.webppl.org/webppl-v0.8.1-3ac8d4d.js"></script>
+  <!-- <script src="//s3-us-west-2.amazonaws.com/cdn.webppl.org/webppl-v0.8.1-3ac8d4d.js"></script> -->
+  <script src="../../core-st/bundle/webppl.js"></script>
 </html>
