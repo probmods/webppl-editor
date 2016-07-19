@@ -424,8 +424,7 @@ var CodeEditor = React.createClass({
 
       comp.setState({execution: 'running'});
 
-      var runner = function() { debugger }//util.trampolineRunners.web();
-
+      var runner = util.trampolineRunners.web();
 
       handleRunError = function(error) {
         // For Chrome only...
@@ -461,9 +460,7 @@ var CodeEditor = React.createClass({
       if (!cachedCompile) {
         cachedCompile = _.memoize(webppl.compileBase);
       }
-      global['resumeTrampoline'] = function() {
-        debugger;
-      };
+      global['resumeTrampoline'] = runner;
 
       wait(20, function() {
         webppl.run(code,
