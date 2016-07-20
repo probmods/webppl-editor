@@ -246,8 +246,6 @@ var ResultList = React.createClass({
 
 var jobsQueue = [], compileCache = {};
 
-var cachedCompile;
-
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
@@ -392,17 +390,7 @@ var CodeEditor = React.createClass({
 
       wpEditor['makeResultContainer'] = comp['makeResultContainer'];
 
-      var handleRunError;
-
-      // for catching errors in library code like wpEditor.get()
-      global.onerror = function(message, source, lineno, colno, e) {
-        console.log('global.onerror triggered')
-        // TODO: if e is not available, also use source, lineno, and colno
-        handleRunError(e || message)
-      }
-
       // run vanilla js
-      // TODO: detect language from codemirror value, not React prop
       if (language == 'javascript') {
         // TODO: grey out the run button but don't show a cancel button
         try {
@@ -422,11 +410,7 @@ var CodeEditor = React.createClass({
         return wait(250, job);
       }
 
-      comp.setState({execution: 'running'});
-
-      var runner = util.trampolineRunners.web();
-
-      handleRunError = function(error) {
+      var handleRunError = function(error) {
         // For Chrome only...
 
         // If debug=true is passed to run (as below), then wpplError is
@@ -455,21 +439,49 @@ var CodeEditor = React.createClass({
 
       };
 
-      // Make a cached version of webppl's compile function. Passed to
-      // webppl.run below.
-      if (!cachedCompile) {
-        cachedCompile = _.memoize(webppl.compileBase);
+      var handleCompileError = function(e) {
+        console.error('Compile error');
+        handleError(e)
+      };
+
+
+      // catch errors in library code (like editor.get())
+      global.onerror = function(message, source, lineno, colno, e) {
+        console.log('global.onerror triggered')
+        // TODO: if e is not available, also use source, lineno, and colno
+        handleRunError(e || message)
       }
-      global['resumeTrampoline'] = runner;
 
-      wait(20, function() {
-        webppl.run(code,
-                   endJob,
-                   {errorHandlers: [handleRunError], debug: true, compile: cachedCompile, runner: runner})
+      comp.setState({execution: 'compiling'});
 
-      })
+      wait(
+        20,
+        function() {
+          // (memoized) compile code
+          if (!compileCache[code]) {
+            try {
+              compileCache[code] = webppl.compile(code);
+            } catch(e) {
+              handleCompileError(e)
+              return;
+            }
+          }
 
+          var baseRunner = util.trampolineRunners.web();
+          var compiled = compileCache[code];
+          var prepared = webppl.prepare(compiled,
+                                        endJob,
+                                        {errorHandlers: [handleRunError], debug: true, baseRunner: baseRunner});
+          comp.runner = baseRunner;
+          global['resumeTrampoline'] = prepared.runner;
 
+          comp.setState({execution: 'running'});
+
+          wait(20, function() {
+            prepared.run()
+          })
+
+        });
 
 
     };
