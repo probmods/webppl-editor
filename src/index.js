@@ -460,7 +460,7 @@ var CodeEditor = React.createClass({
           // (memoized) compile code
           if (!compileCache[code]) {
             try {
-              compileCache[code] = webppl.compile(code);
+              compileCache[code] = webppl.compile(code, {debug: true});
             } catch(e) {
               handleCompileError(e)
               return;
