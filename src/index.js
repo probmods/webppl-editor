@@ -440,7 +440,18 @@ var CodeEditor = React.createClass({
       };
 
       var handleCompileError = function(e) {
-        console.error('Compile error');
+        var message = e.message;
+
+        var cm = comp.refs.editor.getCodeMirror();
+
+        var re_line = /Line ([0-9]+): /;
+        if (re_line.test(message)) {
+          var line = re_line.exec(message)[1] - 1;
+          cm.markText({line: line, ch: 0},
+                      {line: line, ch: Infinity},
+                      {className: "CodeMirrorError", clearOnEnter: true});
+        }
+        e.message = "Syntax error: " + e.message.replace(re_line, "");
         handleError(e)
       };
 
