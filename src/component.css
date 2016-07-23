@@ -1,25 +1,25 @@
 .meta {
-    position: absolute;
-    right: 0px;
-    background-color: rgba(0,0,0,0.5);
-    color: white;
+    background-color: #eee;
     font-size: 12px;
     padding: 1em;
-    min-width: 200px;
+    color: black;
 }
 
-.drawerButton {
-    position: absolute;
-    right: 0;
-    margin-right: 3px;
+.wpedit .drawerButton {
+    float: right;
     color: #ccc;
     z-index: 120;
-    user-select: none;
+    background-color: white;
+    border: 1px solid #eee;
+    min-width: 0;
 }
 
 .drawerButton:hover {
-    cursor: pointer
+    cursor: pointer;
+    color: #99ccff;
 }
+
+button:focus {outline:0;}
 
 span.CodeMirror-nonmatchingbracket {color: #f22;}
 

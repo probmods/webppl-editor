@@ -193,9 +193,6 @@ var ResultList = React.createClass({
       minHeight: 0
     }
   },
-  showMetaDrawer: function() {
-    this.setState({metaVisible: !this.state.metaVisible})
-  },
   // auto scroll to bottom (if user is already at the bottom)
   // HT http://blog.vjeux.com/2013/javascript/scroll-position-with-react.html
   // this is a modification that works with MutationObserver
@@ -261,12 +258,6 @@ var ResultList = React.createClass({
     var seed = this.props.seed;
 
     return (<div style={style} className={'result ' + (this.props.newborn ? 'hide' : '')}>
-            <span className="drawerButton" onClick={this.showMetaDrawer}>☰</span>
-        <ResultMetaDrawer
-            visible={this.state.metaVisible}
-            webppl={webpplVersion}
-            seed={seed}
-            />
             {list}
             </div>);
 
@@ -280,7 +271,8 @@ var CodeEditor = React.createClass({
     return {
       results: [],
       newborn: true,
-      execution: 'idle'
+      execution: 'idle',
+      showMeta: false
     }
   },
   // side effects
@@ -526,6 +518,9 @@ var CodeEditor = React.createClass({
       return {results: state.results.concat(result)}
     });
   },
+  toggleMetaDrawer: function() {
+    this.setState({showMeta: !this.state.showMeta})
+  },
   render: function() {
     var comp = this;
     // TODO: allow configuring this
@@ -550,6 +545,8 @@ var CodeEditor = React.createClass({
 
     var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
 
+    var drawerButtonLabel = this.state.showMeta ? "▲" : "▼";
+
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
     return (
@@ -561,12 +558,15 @@ var CodeEditor = React.createClass({
                              codeMirrorInstance={CodeMirror} />
         <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
+        <button className="drawerButton" onClick={this.toggleMetaDrawer}>{drawerButtonLabel}</button>
+        <ResultMetaDrawer visible={this.state.showMeta}
+                          webppl={webpplVersion}
+                          seed={this.state.seed} />
         <ResultList ref='resultList'
                     newborn={this.state.newborn}
                     executionState={this.state.execution}
                     list={this.state.results}
-                    seed={this.state.seed}
-                    webpplVersion={webpplVersion} />
+        />
         </div>
     );
   }
