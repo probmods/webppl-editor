@@ -130,19 +130,22 @@ var ResultText = React.createClass({
       warn: "⚠",
       error: "x",
       info: "i"
-    }[this.props.subtype || "log"];
+    }[subtype];
 
     var spanClass='icon ' + subtype;
 
     var count = this.props.count == 1 || this.props.count === undefined ? "" : "(" + this.props.count + ") ";
     var message = this.props.message;
 
-    return (<div>
-            <span className={spanClass}>{icon}</span>
-            <span className='count'>{count}</span>
-            <pre key={this.props._key} className='text'>{message}</pre>
-            </div>
-    );
+    if (subtype == "log") {
+      return (<pre key={this.props._key} className='text'>{message}</pre>)
+    } else {
+      return  (<div>
+               <span className={spanClass}>{icon}</span>
+               <span className='count'>{count}</span>
+               <pre key={this.props._key} className='text'>{message}</pre>
+               </div>);
+    }
   }
 });
 
