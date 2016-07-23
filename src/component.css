@@ -7,10 +7,11 @@
 
 .wpedit .drawerButton {
     float: right;
-    color: #ccc;
+    color: #ddd;
     z-index: 120;
     background-color: white;
-    border: 1px solid #eee;
+    border: 1px solid #fff;
+    padding: 0.5em 0.5em;
     min-width: 0;
 }
 
@@ -19,7 +20,9 @@
     color: #99ccff;
 }
 
-button:focus {outline:0;}
+button:focus {
+    outline:0;
+}
 
 span.CodeMirror-nonmatchingbracket {color: #f22;}
 
