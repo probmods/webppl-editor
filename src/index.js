@@ -198,16 +198,42 @@ var ResultList = React.createClass({
   },
   // auto scroll to bottom (if user is already at the bottom)
   // HT http://blog.vjeux.com/2013/javascript/scroll-position-with-react.html
-  componentWillUpdate: function() {
+  // this is a modification that works with MutationObserver
+  _autoscroller: function() {
     var node = ReactDOM.findDOMNode(this);
-    // 4 is a fudge factor
-    this.shouldScrollBottom = node.scrollHeight - (node.scrollTop + node.offsetHeight) < 4;
-  },
-  componentDidUpdate: function() {
-    if (this.shouldScrollBottom) {
-      var node = ReactDOM.findDOMNode(this);
+    // auto scroll either if the user didn't scroll to a non-bottom position
+    var nodeHeight = $(node).height();
+    this.lastScrollTop = node.scrollTop;
+    if (node.scrollHeight > node.scrollTop + nodeHeight + 4) {
       node.scrollTop = node.scrollHeight
     }
+  },
+  componentWillMount: function() {
+    this.autoscroller = _.throttle(this._autoscroller, 50);
+    this.ResultsMutationObserver = new MutationObserver(this.autoscroller);
+  },
+  componentWillUnmount: function() {
+    this.ResultsMutationObserver.disconnect();
+    $(ReactDOM.findDOMNode(this)).unbind('scroll');
+  },
+  componentDidMount: function() {
+    var comp = this,
+        mo = this.ResultsMutationObserver,
+        node = ReactDOM.findDOMNode(this),
+        scrollHandler = function(e) {
+          if (node.scrollTop < comp.lastScrollTop) {
+            // if user scrolled up, disconnect
+            mo.disconnect();
+          } else if (node.scrollTop + node.offsetHeight/* NB */ + 30 > node.scrollHeight) {
+            // if user scrolled to very bottom, reconnect
+            // but first, prevent flick-scrolling to get to the bottom from "overflowing"
+            // and also scrolling the parent webpage
+            e.stopImmediatePropagation();
+            mo.observe(node, {childList: true, attributes: true, subtree: true});
+          }
+        }
+
+    $(node).scroll(scrollHandler);
   },
   render: function() {
     var renderResult = function(d,k) {
@@ -311,6 +337,9 @@ var CodeEditor = React.createClass({
 
     this.setState({newborn: false, results: []});
 
+    resultList.ResultsMutationObserver.observe($resultsDiv[0],
+                                               {childList: true, attributes: true, subtree: true});
+
     var comp = this;
     var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
@@ -325,6 +354,9 @@ var CodeEditor = React.createClass({
 
     // TODO: incorporate this into the other side effect stuff
     var nativeConsole = console;
+    if (!global['nativeConsole']) {
+      global['nativeConsole'] = nativeConsole;
+    }
 
     var cleanup = function() {
       global['console'] = nativeConsole;
