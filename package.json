@@ -41,11 +41,9 @@
     "grunt-contrib-watch": "^1.0.0",
     "grunt-subgrunt": "^1.2.0",
     "jstransform": "^11.0.3",
-    "nodeunit": "^0.9.1",
     "open": "0.0.5",
     "through": "^2.3.8",
-    "watchify": "^3.6.1",
-    "webppl": "probmods/webppl#20a0c37ff27387944f36fd2fd8b9458dc97abef7"
+    "watchify": "^3.6.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
