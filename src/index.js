@@ -14,9 +14,6 @@ require('codemirror/addon/edit/closebrackets');
 require('codemirror/mode/javascript/javascript');
 require('codemirror/addon/comment/comment'); // installs toggleComment
 
-var SourceMap = require('source-map');
-var stackTrace = require('stack-trace');
-
 var wait = function(ms, f) {
   return setTimeout(f, ms);
 }
