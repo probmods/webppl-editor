@@ -3,7 +3,8 @@
     <meta charset="UTF-8">
     <style>
      body {
-         font-family: Menlo
+         font-family: Menlo;
+         font-size: 12px;
      }
 
      pre {
@@ -18,10 +19,11 @@
      }
 
 
-     #wrapper {
-         width: 50%;
+     .col {
+         width: 40%;
          min-width: 600px;
-         margin: 0 auto;
+         margin: 1em;
+         float: left
      }
 
      canvas.paper {
@@ -36,14 +38,14 @@
     <script src="draw.js"></script>
   </head>
   <body>
-    <div id="wrapper">
-      <b>scratch pad</b>:
+    <div class="col">
+      scratch pad:
       <pre id="ed-scratch"><code></code></pre>
 
-      <b>todo: throttle floods of ResultList updates</b>
+      todo: throttle floods of ResultList updates
       <pre><code>repeat(1000, function() { console.log(uniform(0,1))})</code></pre>
 
-      <b>intercept console methods</b>:
+      intercept console methods:
       <pre><code>console.log("log")
 console.info("info")
 console.warn("warning")
@@ -55,48 +57,19 @@ var bs = repeat(100, function() { beta(0.001, 0.001) });
 
 3</code></pre>
 
-      <b>compile error</b>:
-      <pre><code>flip(</code></pre>
-
-      <b>tricky reference error</b>:
-      <pre><code>print('started');
-var x = sum(repeat(1e5, flip))
-tricky + 5
-print('ended')</code></pre>
-
-      <b>nested reference error</b>:
-      <pre><code>var a = function () {
-    return {a:1}[notDefinedVariable]
-}
-return a()</code></pre>
-
-      <b>header error</b>:
-      <pre><code>map('not a function', [0])</code></pre>
-
-      <b>throwing strings</b>:
-      <pre><code>print('started');
-var x = sum(repeat(1e5, flip))
-window.throwString();
-print('ended')</code></pre>
-
-      <b>external library error</b>:
-      <pre><code>var posterior = wpEditor.get('foo');
-posterior
-      </code></pre>
-
-      <b>MCMC callback:</b>
+      MCMC callback:
       <pre><code>var model = function() { return gaussian(0,1) };
 MCMC(model, { samples: 1e6, callbacks: [wpEditor.MCMCProgress()]});</code></pre>
 
-      <b>Work across boxes 1 - store an inference result:</b>
+      Work across boxes 1 - store an inference result:
       <pre><code>var posterior = ParticleFilter(function() { return gaussian(0,1) },100);
 wpEditor.put('n(0,1):100', posterior)</code></pre>
 
-      <b>Work across boxes 2 - post-processing an inference result:</b>
+      Work across boxes 2 - post-processing an inference result:
       <pre><code>var posterior = wpEditor.get('n(0,1):100');
 _.max(posterior.support())</code></pre>
 
-      <b>dippl.org computer vision example:</b>
+      dippl.org computer vision example:
       <pre id="dippl-cv-beach"><code>///fold:
 var targetImage = Draw(50, 50, true);
 loadImage(targetImage, "beach.png")
@@ -175,13 +148,13 @@ MH(
     return lines
    }, 2500);</code></pre>
 
-      <b>Vanilla JS:</b>
+      Vanilla JS:
       <pre><code>// language: javascript
 print('foo');
 [1,2,3].map(function(x) { return x + 1 })</code></pre>
 
 
-      <b>Large file:</b>
+      Large file:
       <pre><code>
 globalStore["x"] = 1 + 1;
 globalStore["x"] = 1 + 1;
@@ -1721,6 +1694,56 @@ globalStore["x"] = 1 + 1;
 globalStore["x"] = 1 + 1;
       </code></pre>
     </div>
+    <div class="col">
+      <h3>error handling</h3>
+
+      syntax - unmatched open bracket:
+      <pre><code>flip(</code></pre>
+
+      syntax - unmatched close bracket:
+      <pre><code>flip()
+)
+      </code></pre>
+
+      syntax - assignment:
+      <pre><code>a = 9</code></pre>
+
+      syntax - trying to overwrite globalStore:
+      <pre><code>globalStore = 9</code></pre>
+
+      syntax - trying to assign to non-globalStore field:
+      <pre><code>a.b = 9</code></pre>
+
+      syntax - hanging dot (TODO):
+      <pre><code>globalStore.</code></pre>
+
+      tricky reference error:
+      <pre><code>print('started');
+var x = sum(repeat(1e5, flip))
+tricky + 5
+print('ended')</code></pre>
+
+      nested reference error:
+      <pre><code>var a = function () {
+    return {a:1}[notDefinedVariable]
+}
+return a()</code></pre>
+
+      header error:
+      <pre><code>map('not a function', [0])</code></pre>
+
+      throwing strings:
+      <pre><code>print('started');
+var x = sum(repeat(1e5, flip))
+window.throwString();
+print('ended')</code></pre>
+
+      external library error:
+      <pre><code>var posterior = wpEditor.get('foo');
+posterior
+      </code></pre>
+
+    </div>
   </body>
   <script>
    var getLanguage = function(code){
@@ -1751,5 +1774,6 @@ globalStore["x"] = 1 + 1;
    var throwString = function() { throw 'string error' };
   </script>
 
-  <script src="//s3-us-west-2.amazonaws.com/cdn.webppl.org/webppl-v0.8.1-3ac8d4d.js"></script>
+
+  <script src="http://cdn.webppl.org/webppl-v0.9.0.js"></script>
 </html>
