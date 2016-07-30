@@ -40,65 +40,6 @@ var renderReturnValue = function(x) {
   return JSON.stringify(x);
 };
 
-function addSourceMap(error, sourceMap) {
-  if (error instanceof Error) {
-    if (error.sourceMaps === undefined) {
-      error.sourceMaps = [];
-    }
-    error.sourceMaps.push(sourceMap);
-  }
-}
-
-function getErrorPosition(error) {
-
-  if (!(error instanceof Error)) {
-    return null;
-  }
-
-  var parsedError = stackTrace.parse(error);
-  // NB: this differs from core webppl; here, we want to highlight the nearest place
-  // of responsibility in the user's code.
-  var firstStackFrame = _.findWhere(parsedError, {fileName: '<anonymous>'});
-
-  // if error occurred in library code, identify it in the message but don't highlight
-  // anything
-  if (!firstStackFrame) {
-    var file = _.last(parsedError[0].fileName.split("/"));
-    error.message = "Error in " + file + ": " + error.message
-    return null;
-  }
-
-  // Switch from 1 to 0 indexed.
-  firstStackFrame.columnNumber--;
-  firstStackFrame.sourceMapped = false;
-
-  if (error.sourceMaps === undefined || firstStackFrame.native) {
-    return firstStackFrame;
-  }
-
-  // Check whether the error occurred in compiled code. We only need
-  // to check the first source map as this is the one added when the
-  // error was first caught.
-
-  var mapConsumer = new SourceMap.SourceMapConsumer(error.sourceMaps[0]);
-  var originalPosition = mapConsumer.originalPositionFor({
-    line: firstStackFrame.lineNumber,
-    column: firstStackFrame.columnNumber
-  });
-
-  if (originalPosition.source === null) {
-    return firstStackFrame;
-  } else {
-    return {
-      fileName: originalPosition.source,
-      lineNumber: originalPosition.line,
-      identifier: originalPosition.name,
-      columnNumber: originalPosition.column,
-      sourceMapped: true
-    };
-  }
-}
-
 var ResultError = React.createClass({
   getInitialState: function() {
     return {showStack: false}
