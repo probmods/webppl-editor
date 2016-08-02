@@ -24,8 +24,8 @@ var renderReturnValue = function(x) {
   }
 
   if (x && (x.score != undefined) && (x.sample != undefined))
-    // TODO: show as table?
-    return '<erp>';
+    // TODO: show something more useful by default?
+    return '<distribution>';
 
   if (typeof x == 'function')
     return '<function ' + x.name + '>';
