@@ -453,6 +453,9 @@ var CodeEditor = React.createClass({
 
           comp.setState({execution: 'running'});
 
+          var seed = _.now();
+          comp.setState({seed: seed});
+          util.seedRNG(seed);
           wait(20, function() {
             prepared.run()
           })
