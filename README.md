@@ -1,4 +1,4 @@
-A browser-based code editor for WebPPL (requires version 0.8.1 or higher)
+A browser-based code editor for WebPPL (requires version 0.9.0 or higher)
 
 Demo: https://probmods.github.io/webppl-editor
 
@@ -9,8 +9,8 @@ Usage:
 <head>
 <meta charset="UTF-8"> <!-- tell the browser that editor.js contains unicode -->
 <script src="webppl.js"></script> <!-- compiled webppl library; get this from https://github.com/probmods/webppl -->
-<script src="editor.js"></script>
-<link rel="stylesheet" href="editor.css">
+<script src="webppl-editor.js"></script>
+<link rel="stylesheet" href="webppl-editor.css">
 </head>
 <body>
 ...
