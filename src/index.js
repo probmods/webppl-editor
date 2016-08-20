@@ -274,6 +274,7 @@ var CodeEditor = React.createClass({
     var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
 
+    // TODO: make runtime clock dynamic
     var runT0;
 
     var endJob = function(store, returnValue) {
@@ -324,23 +325,31 @@ var CodeEditor = React.createClass({
       var lastMessages = {};
       var makeConsoleMethod = function(subtype) {
         return function() {
-          var args = _.toArray(arguments);
-          var message = args.join(' ');
-          var lastMessage = lastMessages[subtype];
+          if (!comp.state.consoleMuted) {
 
-          if (lastMessage == message) {
-            comp.setState(function(state, props) {
-              // TODO: is mutating state okay?
-              var idx = _.findLastIndex(state.results,
-                                        function(res) { return res.subtype == subtype});
-              state.results[idx].count += 1;
-              return state;
-            })
-          } else {
-            comp.addResult({type: 'text', subtype: subtype, message: message, count: 1});
-            lastMessages[subtype] = message;
-            nativeConsole[subtype](message);
+            var args = _.toArray(arguments);
+            var message = args.join(' ');
+            var lastMessage = lastMessages[subtype];
+
+            // if this message is a repeat of the previous one,
+            // increment a counter on the previous counter rather than
+            // redundantly printing this new message
+            if (lastMessage == message) {
+              comp.setState(function(state, props) {
+                // TODO: is mutating state okay?
+                var idx = _.findLastIndex(state.results,
+                                          function(res) { return res.subtype == subtype});
+                state.results[idx].count += 1;
+                return state;
+              })
+            } else {
+              comp.addResult({type: 'text', subtype: subtype, message: message, count: 1});
+              lastMessages[subtype] = message;
+            }
+
           }
+
+          nativeConsole[subtype](message);
         }
       }
 
@@ -348,7 +357,13 @@ var CodeEditor = React.createClass({
         log: makeConsoleMethod('log'),
         info: makeConsoleMethod('info'),
         warn: makeConsoleMethod('warn'),
-        error: makeConsoleMethod('error')
+        error: makeConsoleMethod('error'),
+        mute: function() {
+          comp.setState({consoleMuted: true})
+        },
+        unmute: function() {
+          comp.setState({consoleMuted: false})
+        }
       };
 
       // inject this component's side effect methods into global

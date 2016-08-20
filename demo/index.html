@@ -51,9 +51,14 @@ console.info("info")
 console.warn("warning")
 console.error("error")
 
-var as = repeat(100, function() { beta(0.001, 0.001) });
+var as = repeat(20, function() { beta(0.001, 0.001) });
 util.warn("foo");
-var bs = repeat(100, function() { beta(0.001, 0.001) });
+var bs = repeat(20, function() { beta(0.001, 0.001) });
+
+console.mute();
+console.log("this won't show up")
+console.unmute();
+console.log("this will show up")
 
 3</code></pre>
 
