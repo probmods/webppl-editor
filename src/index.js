@@ -274,9 +274,13 @@ var CodeEditor = React.createClass({
     var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
 
+    var runT0;
+
     var endJob = function(store, returnValue) {
       var renderedReturnValue = renderReturnValue(returnValue);
       comp.addResult({type: 'text', message: renderedReturnValue });
+      var runT1 = _.now();
+      comp.setState({runTime: (runT1 - runT0) + 'ms'});
       cleanup();
     }
 
@@ -434,9 +438,16 @@ var CodeEditor = React.createClass({
         20,
         function() {
           // (memoized) compile code
-          if (!compileCache[code]) {
+
+          var compileT0 = _.now();
+
+          if (compileCache[code]) {
+            comp.setState({compileTime: 'cached'})
+          } else {
             try {
               compileCache[code] = webppl.compile(code, {debug: true});
+              var compileT1 = _.now();
+              comp.setState({compileTime: (compileT1 - compileT0) + 'ms'});
             } catch(e) {
               handleCompileError(e)
               return;
@@ -457,6 +468,7 @@ var CodeEditor = React.createClass({
           comp.setState({seed: seed});
           util.seedRNG(seed);
           wait(20, function() {
+            runT0 = _.now();
             prepared.run()
           })
 
@@ -508,25 +520,33 @@ var CodeEditor = React.createClass({
 
     var webpplVersion = global.webppl ? global.webppl.version : '';
 
+    var webpplPackages = global.webppl ? global.webppl.packages.map(function(pkg) {
+      return pkg.name + ' ' + pkg.version
+    }).join(', ') : 'n/a';
+
     var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
 
     var drawerButtonLabel = this.state.showMeta ? "▲" : "▼";
 
     // TODO: get rid of CodeMirrorComponent ref by running refresh in it's own componentDidMount?
     // see http://stackoverflow.com/a/25723635/351392 for another approach mimicking inheritance in react
-    return (
-        <div ref='cont' className='wpedit'>
-        <CodeMirrorComponent ref='editor'
-                             value={code}
-                             options={options}
-                             onChange={comp.props.onChange}
-                             codeMirrorInstance={CodeMirror} />
-        <RunButton status={this.state.execution} clickHandler={this.runCode} />
+    return (<div ref='cont' className='wpedit'>
+            <CodeMirrorComponent ref='editor'
+                                 value={code}
+                                 options={options}
+                                 onChange={comp.props.onChange}
+                                 codeMirrorInstance={CodeMirror} />
+            <RunButton status={this.state.execution} clickHandler={this.runCode} />
         <button className = {_.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide'} onClick={this.cancelRun}>cancel</button>
         <button className="drawerButton" onClick={this.toggleMetaDrawer}>{drawerButtonLabel}</button>
-        <ResultMetaDrawer visible={this.state.showMeta}
-                          webppl={webpplVersion}
-                          seed={this.state.seed} />
+            <ResultMetaDrawer visible={this.state.showMeta}
+            webppl={webpplVersion}
+            packages={webpplPackages}
+            seed={this.state.seed}
+            compile={this.state.compileTime}
+            run={this.state.runTime}
+
+            />
         <ResultList ref='resultList'
                     newborn={this.state.newborn}
                     executionState={this.state.execution}
