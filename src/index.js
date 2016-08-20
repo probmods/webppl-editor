@@ -274,14 +274,13 @@ var CodeEditor = React.createClass({
     var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
 
-    // TODO: make runtime clock dynamic
-    var runT0;
+    var runT0, runClockId;
 
     var endJob = function(store, returnValue) {
+      clearInterval(runClockId);
       var renderedReturnValue = renderReturnValue(returnValue);
       comp.addResult({type: 'text', message: renderedReturnValue });
-      var runT1 = _.now();
-      comp.setState({runTime: (runT1 - runT0) + 'ms'});
+      comp.setState({runTime: (_.now() - runT0)/1000 + 's'});
       cleanup();
     }
 
@@ -462,7 +461,7 @@ var CodeEditor = React.createClass({
             try {
               compileCache[code] = webppl.compile(code, {debug: true});
               var compileT1 = _.now();
-              comp.setState({compileTime: (compileT1 - compileT0) + 'ms'});
+              comp.setState({compileTime: (compileT1 - compileT0)/1000 + 's'});
             } catch(e) {
               handleCompileError(e)
               return;
@@ -484,6 +483,12 @@ var CodeEditor = React.createClass({
           util.seedRNG(seed);
           wait(20, function() {
             runT0 = _.now();
+
+            runClockId = setInterval(function() {
+              comp.setState({runTime: (_.now() - runT0)/1000 + 's' })
+            }, 1000)
+
+
             prepared.run()
           })
 
