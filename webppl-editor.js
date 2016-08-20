@@ -42918,8 +42918,8 @@ var renderReturnValue = function (x) {
   }
 
   if (x && x.score != undefined && x.sample != undefined)
-    // TODO: show as table?
-    return '<erp>';
+    // TODO: show something more useful by default?
+    return '<distribution>';
 
   if (typeof x == 'function') return '<function ' + x.name + '>';
 
@@ -43171,9 +43171,13 @@ var CodeEditor = React.createClass({
     var code = comp.refs.editor.getCodeMirror().getValue();
     var language = comp.props.language; // TODO: detect this from CodeMirror text
 
+    var runT0, runClockId;
+
     var endJob = function (store, returnValue) {
+      clearInterval(runClockId);
       var renderedReturnValue = renderReturnValue(returnValue);
       comp.addResult({ type: 'text', message: renderedReturnValue });
+      comp.setState({ runTime: (_.now() - runT0) / 1000 + 's' });
       cleanup();
     };
 
@@ -43217,24 +43221,31 @@ var CodeEditor = React.createClass({
       var lastMessages = {};
       var makeConsoleMethod = function (subtype) {
         return function () {
-          var args = _.toArray(arguments);
-          var message = args.join(' ');
-          var lastMessage = lastMessages[subtype];
+          if (!comp.state.consoleMuted) {
 
-          if (lastMessage == message) {
-            comp.setState(function (state, props) {
-              // TODO: is mutating state okay?
-              var idx = _.findLastIndex(state.results, function (res) {
-                return res.subtype == subtype;
+            var args = _.toArray(arguments);
+            var message = args.join(' ');
+            var lastMessage = lastMessages[subtype];
+
+            // if this message is a repeat of the previous one,
+            // increment a counter on the previous counter rather than
+            // redundantly printing this new message
+            if (lastMessage == message) {
+              comp.setState(function (state, props) {
+                // TODO: is mutating state okay?
+                var idx = _.findLastIndex(state.results, function (res) {
+                  return res.subtype == subtype;
+                });
+                state.results[idx].count += 1;
+                return state;
               });
-              state.results[idx].count += 1;
-              return state;
-            });
-          } else {
-            comp.addResult({ type: 'text', subtype: subtype, message: message, count: 1 });
-            lastMessages[subtype] = message;
-            nativeConsole[subtype](message);
+            } else {
+              comp.addResult({ type: 'text', subtype: subtype, message: message, count: 1 });
+              lastMessages[subtype] = message;
+            }
           }
+
+          nativeConsole[subtype](message);
         };
       };
 
@@ -43242,7 +43253,13 @@ var CodeEditor = React.createClass({
         log: makeConsoleMethod('log'),
         info: makeConsoleMethod('info'),
         warn: makeConsoleMethod('warn'),
-        error: makeConsoleMethod('error')
+        error: makeConsoleMethod('error'),
+        mute: function () {
+          comp.setState({ consoleMuted: true });
+        },
+        unmute: function () {
+          comp.setState({ consoleMuted: false });
+        }
       };
 
       // inject this component's side effect methods into global
@@ -43324,9 +43341,16 @@ var CodeEditor = React.createClass({
 
       wait(20, function () {
         // (memoized) compile code
-        if (!compileCache[code]) {
+
+        var compileT0 = _.now();
+
+        if (compileCache[code]) {
+          comp.setState({ compileTime: 'cached' });
+        } else {
           try {
             compileCache[code] = webppl.compile(code, { debug: true });
+            var compileT1 = _.now();
+            comp.setState({ compileTime: (compileT1 - compileT0) / 1000 + 's' });
           } catch (e) {
             handleCompileError(e);
             return;
@@ -43341,7 +43365,16 @@ var CodeEditor = React.createClass({
 
         comp.setState({ execution: 'running' });
 
+        var seed = _.now();
+        comp.setState({ seed: seed });
+        util.seedRNG(seed);
         wait(20, function () {
+          runT0 = _.now();
+
+          runClockId = setInterval(function () {
+            comp.setState({ runTime: (_.now() - runT0) / 1000 + 's' });
+          }, 1000);
+
           prepared.run();
         });
       });
@@ -43398,6 +43431,10 @@ var CodeEditor = React.createClass({
 
     var webpplVersion = global.webppl ? global.webppl.version : '';
 
+    var webpplPackages = global.webppl ? global.webppl.packages.map(function (pkg) {
+      return pkg.name + ' ' + pkg.version;
+    }).join(', ') : 'n/a';
+
     var code = this.refs.editor ? this.refs.editor.getCodeMirror().getValue() : this.props.code;
 
     var drawerButtonLabel = this.state.showMeta ? "▲" : "▼";
@@ -43410,7 +43447,12 @@ var CodeEditor = React.createClass({
       onChange: comp.props.onChange,
       codeMirrorInstance: CodeMirror }), React.createElement(RunButton, { status: this.state.execution, clickHandler: this.runCode }), React.createElement('button', { className: _.contains(['running'], this.state.execution) ? 'cancel' : 'cancel hide', onClick: this.cancelRun }, 'cancel'), React.createElement('button', { className: 'drawerButton', onClick: this.toggleMetaDrawer }, drawerButtonLabel), React.createElement(ResultMetaDrawer, { visible: this.state.showMeta,
       webppl: webpplVersion,
-      seed: this.state.seed }), React.createElement(ResultList, { ref: 'resultList',
+      packages: webpplPackages,
+      seed: this.state.seed,
+      compile: this.state.compileTime,
+      run: this.state.runTime
+
+    }), React.createElement(ResultList, { ref: 'resultList',
       newborn: this.state.newborn,
       executionState: this.state.execution,
       list: this.state.results
