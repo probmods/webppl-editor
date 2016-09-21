@@ -229,8 +229,9 @@ var CodeEditor = React.createClass({
     if (x.__print__) {
       return k(s, x.__print__(x));
     } else {
+      var type = typeof x;
       this.addResult({type: 'text',
-        message: typeof x == 'object' ? JSON.stringify(x) : x})
+                      message: _.contains(['object', 'boolean', 'number'], type) ? JSON.stringify(x) : x})
       return k(s)
     }
   },
