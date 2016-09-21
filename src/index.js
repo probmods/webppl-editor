@@ -366,6 +366,14 @@ var CodeEditor = React.createClass({
         }
       };
 
+      // pass through un-intercepted console methods
+      _.each(_.difference(_.methods(nativeConsole),
+                          _.methods(global['console'])),
+             function(key) {
+               global['console'][key] = nativeConsole[key]
+             }
+            )
+
       // inject this component's side effect methods into global
       var sideEffectMethods = ['print'];
       _.each(sideEffectMethods,
