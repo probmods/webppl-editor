@@ -92,6 +92,9 @@
 .icon.error {
     background-color: red;
 }
+.icon.log {
+    display: none
+}
 .result .count:not(:empty) {
     font-family: Helvetica;
     font-size: 10px;
