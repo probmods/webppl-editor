@@ -203,7 +203,7 @@ var ResultList = React.createClass({
 
     return (
         <div style={style} className={className}>
-        <button onClick={this.props.clear} className={'clearButton ' +  executionState}>X</button>
+        <button onClick={this.props.clear} className={'clearButton ' +  this.props.executionState}>X</button>
         {list}
       </div>
         );
