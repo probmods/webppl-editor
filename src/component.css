@@ -77,13 +77,13 @@
     position: absolute;
     top: 0px;
     right: 0px;
-    background-color: #eeeeee;
     min-width: 0;
-    color: white;
+    color: #ccc;
     font-weight: bold;
     margin: 0;
     padding: 10px;
     border: none;
+    z-index: 99;
 }
 
 .wpedit .clearButton:hover {
