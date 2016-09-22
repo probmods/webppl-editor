@@ -62,9 +62,8 @@
     word-break: break-all;
 }
 
-.wpedit pre.error {
-    background-color: red;
-    color: white;
+.wpedit .result pre.error {
+    color: red;
 }
 
 .wpedit .error-message {
