@@ -11,7 +11,8 @@ var CodeMirrorComponent = require('react-codemirror');
 var Folding = require('./folding')(CodeMirror);
 require('codemirror/addon/edit/matchbrackets');
 require('codemirror/addon/edit/closebrackets');
-require('codemirror/mode/javascript/javascript');
+//require('codemirror/mode/javascript/javascript');
+require('./wppl-mode.js')
 require('codemirror/addon/comment/comment'); // installs toggleComment
 
 var wait = function(ms, f) {

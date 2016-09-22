@@ -33,6 +33,13 @@
     color: black;
     background-color: #ECAAB9;
 }
+
+/* wppl keywords */
+
+.cm-wppl {
+    font-weight: bold
+}
+
 /* -- folding */
 .wpedit .CodeMirror-foldmarker {
     background-color: #ffffcc;
