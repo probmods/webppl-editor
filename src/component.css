@@ -73,6 +73,23 @@
     cursor: pointer
 }
 
+.wpedit .clearButton {
+    position: absolute;
+    top: -1;
+    right: -1;
+    background-color: transparent;
+    min-width: 0;
+    color: #0473e0;
+    font-weight: bold;
+    border: none;
+    margin: 0;
+    padding: 5px 5px 10px 10px;
+}
+
+.wpedit .clearButton.running {
+    display: none;
+}
+
 /* -- console method intercepting */
 .result .icon {
     border-radius: 5px;
@@ -116,23 +133,24 @@
 .wpedit .progress {
     font-size: 11px;
     position: relative;
-    height: 12px;
+    height: 16px;
+    width: 95%;
+    margin: 5px 0px 5px 5px;
+    background-color: bisque
 }
 
 .wpedit .progress .text {
     position: absolute;
-    top: 0;
     left: 0;
+    top: 0;
 }
 
 .wpedit .progress .fill {
     background-color: #99ccff;
-    transition: width 0.08s ease;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 0;
+    /* transition: width 0.08s ease; */
     height: 100%;
+    padding: 0;
+    margin: 0
 }
 
 /* buttons */

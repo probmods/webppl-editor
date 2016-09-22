@@ -128,8 +128,12 @@ var ResultList = React.createClass({
   getInitialState: function() {
     return {
       metaVisible: false,
-      minHeight: 0
+      minHeight: 0,
+      hide: false
     }
+  },
+  hide: function() {
+    this.setState({hide: true})
   },
   // auto scroll to bottom (if user is already at the bottom)
   // HT http://blog.vjeux.com/2013/javascript/scroll-position-with-react.html
@@ -195,9 +199,14 @@ var ResultList = React.createClass({
     var webpplVersion = this.props.webpplVersion;
     var seed = this.props.seed;
 
-    return (<div style={style} className={'result ' + (this.props.newborn ? 'hide' : '')}>
-            {list}
-            </div>);
+    var className = 'result ' + (list.length == 0 ? ' hide' : '');
+
+    return (
+        <div style={style} className={className}>
+        <button onClick={this.props.clear} className={'clearButton ' +  executionState}>X</button>
+        {list}
+      </div>
+        );
 
   }
 })
@@ -524,6 +533,9 @@ var CodeEditor = React.createClass({
       return {results: state.results.concat(result)}
     });
   },
+  clearResults: function() {
+    this.setState({results: []})
+  },
   toggleMetaDrawer: function() {
     this.setState({showMeta: !this.state.showMeta})
   },
@@ -577,9 +589,10 @@ var CodeEditor = React.createClass({
 
             />
         <ResultList ref='resultList'
-                    newborn={this.state.newborn}
-                    executionState={this.state.execution}
-                    list={this.state.results}
+            newborn={this.state.newborn}
+            clear={this.clearResults}
+            executionState={this.state.execution}
+            list={this.state.results}
         />
         </div>
     );
