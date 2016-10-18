@@ -12,7 +12,7 @@ module.exports = function(grunt) {
         'node_modules/webppl': 'browserify'
       }
     },
-    clean: ['bundle/*.js'],
+    clean: ['docs/webppl-editor.js', 'docs/webppl-editor.css'],
     watch: {
       ad: {
         files: ['src/*.js'],
@@ -22,7 +22,7 @@ module.exports = function(grunt) {
   });
 
   function browserifyArgs(args) {
-    return ' -t [babelify --presets [react] ] src/index.js -o bundle/webppl-editor.js';
+    return ' -t [babelify --presets [react] ] src/index.js -o docs/webppl-editor.js';
   }
 
   grunt.loadNpmTasks('grunt-subgrunt');
@@ -42,7 +42,7 @@ module.exports = function(grunt) {
         fs.readFileSync('src/component.css','utf8') +
         fs.readFileSync('node_modules/codemirror/lib/codemirror.css','utf8');
 
-    fs.writeFileSync('bundle/webppl-editor.css', cssSource)
+    fs.writeFileSync('docs/webppl-editor.css', cssSource)
   })
 
   grunt.registerTask('copy-webppl','Copy webppl bundle into bundle/', function() {
@@ -54,14 +54,12 @@ module.exports = function(grunt) {
     grunt.task.run('copy-webppl')
   });
 
-  grunt.registerTask('browserify', 'Generate "bundle/webppl-editor.js".', function() {
-    child_process.execSync('mkdir -p bundle');
+  grunt.registerTask('browserify', 'Generate "docs/webppl-editor.js".', function() {
     child_process.execSync('browserify' + browserifyArgs(arguments));
   });
 
   grunt.registerTask('browserify-watch', 'Run the browserify task on fs changes.', function() {
     var done = this.async();
-    child_process.execSync('mkdir -p bundle');
     var args = '-v' + browserifyArgs(arguments);
     var p = child_process.spawn('watchify', args.split(' '));
     p.stdout.on('data', grunt.log.writeln);
@@ -71,7 +69,7 @@ module.exports = function(grunt) {
 
   grunt.registerTask('uglify', 'Generate "bundle/webppl-editor.min.js".', function() {
     child_process.execSync('mkdir -p bundle');
-    child_process.execSync('uglifyjs bundle/webppl-editor.js -b ascii_only=true,beautify=false > bundle/webppl-editor.min.js');
+    child_process.execSync('uglifyjs docs/webppl-editor.js -b ascii_only=true,beautify=false > docs/webppl-editor.min.js');
   });
 
 };
