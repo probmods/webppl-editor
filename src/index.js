@@ -76,7 +76,7 @@ var ResultText = React.createClass({
     var count = this.props.count == 1 || this.props.count === undefined ? "" : "(" + this.props.count + ") ";
     var message = this.props.message;
 
-    if (this.props.count == 1) {
+    if (this.props.count == 1 && this.subtype == 'log') {
       return (<pre key={this.props._key} className='text'>{message}</pre>)
     } else {
       return  (<div>
