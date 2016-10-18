@@ -7,7 +7,13 @@ var fs = require('fs');
 
 module.exports = function(grunt) {
   grunt.initConfig({
-    clean: ['docs/webppl-editor.js', 'docs/webppl-editor.css']
+    clean: ['docs/webppl-editor.js', 'docs/webppl-editor.css'],
+    watch: {
+      scripts: {
+        files: ['src/component.css'],
+        tasks: ['css']
+      }
+    }
   });
 
   function browserifyArgs(args) {
@@ -36,8 +42,8 @@ module.exports = function(grunt) {
     child_process.execSync('browserify' + browserifyArgs(arguments));
   });
 
-  // TODO: watch for css changes too
-  grunt.registerTask('browserify-watch', 'Run the browserify task on fs changes.', function() {
+  // TODO: integrate watch-js and watch-css (maybe using grunt-parallel?)
+  grunt.registerTask('watch-js', 'Run the browserify task on fs changes.', function() {
     var done = this.async();
     var args = '-v' + browserifyArgs(arguments);
     var p = child_process.spawn('watchify', args.split(' '));
@@ -45,6 +51,11 @@ module.exports = function(grunt) {
     p.stderr.on('data', grunt.log.writeln);
     p.on('close', done);
   });
+
+  grunt.registerTask('watch-css', 'Run the browserify task on fs changes.', function() {
+    grunt.task.run('watch')
+  });
+
 
   grunt.registerTask('uglify', 'Generate "docs/webppl-editor.min.js".', function() {
     child_process.execSync('uglifyjs docs/webppl-editor.js -b ascii_only=true,beautify=false > docs/webppl-editor.min.js');
