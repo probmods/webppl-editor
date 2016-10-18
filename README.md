@@ -38,10 +38,10 @@ We also ship the editor as `editor.ReactComponent`.
 Development:
 
 ```sh
-grunt browserify        # makes webppl-editor.js
-grunt css               # makes webppl-editor.css
-grunt uglify            # makes webppl-editor.min.js
-grunt bundle            # = uglify + css
-grunt webppl            # makes bundle/webppl.js (for testing)
-grunt browserify-watch  # reruns browserify when it detects file changes
+grunt browserify # makes webppl-editor.js
+grunt css        # makes webppl-editor.css
+grunt uglify     # makes webppl-editor.min.js
+grunt bundle     # = browserify + css
+grunt watch-js   # reruns browserify when it detects file changes
+grunt watch-css  # reruns css when it detects file changes
 ```
