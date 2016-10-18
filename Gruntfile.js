@@ -7,34 +7,21 @@ var fs = require('fs');
 
 module.exports = function(grunt) {
   grunt.initConfig({
-    subgrunt: {
-      webppl: {
-        'node_modules/webppl': 'browserify'
-      }
-    },
-    clean: ['docs/webppl-editor.js', 'docs/webppl-editor.css'],
-    watch: {
-      ad: {
-        files: ['src/*.js'],
-        tasks: ['build']
-      }
-    }
+    clean: ['docs/webppl-editor.js', 'docs/webppl-editor.css']
   });
 
   function browserifyArgs(args) {
     return ' -t [babelify --presets [react] ] src/index.js -o docs/webppl-editor.js';
   }
 
-  grunt.loadNpmTasks('grunt-subgrunt');
   grunt.loadNpmTasks('grunt-contrib-clean');
   grunt.loadNpmTasks('grunt-contrib-watch');
 
-  grunt.registerTask('default', ['browserify']);
+  grunt.registerTask('default', ['bundle']);
 
-
-  grunt.registerTask('bundle', 'Create browser bundle (= css + browserify + uglify)', function() {
+  grunt.registerTask('bundle', 'Create browser bundle (= browserify + css)', function() {
     var taskArgs = (arguments.length > 0) ? ':' + _.toArray(arguments).join(':') : '';
-    grunt.task.run('browserify' + taskArgs, 'uglify','css');
+    grunt.task.run('browserify' + taskArgs, 'css');
   });
 
   grunt.registerTask('css', 'Concatenate css files', function() {
@@ -45,19 +32,11 @@ module.exports = function(grunt) {
     fs.writeFileSync('docs/webppl-editor.css', cssSource)
   })
 
-  grunt.registerTask('copy-webppl','Copy webppl bundle into bundle/', function() {
-    child_process.execSync('cp node_modules/webppl/bundle/webppl.js bundle/');
-  })
-
-  grunt.registerTask('webppl', 'Make webppl bundle', function() {
-    grunt.task.run('subgrunt:webppl')
-    grunt.task.run('copy-webppl')
-  });
-
   grunt.registerTask('browserify', 'Generate "docs/webppl-editor.js".', function() {
     child_process.execSync('browserify' + browserifyArgs(arguments));
   });
 
+  // TODO: watch for css changes too
   grunt.registerTask('browserify-watch', 'Run the browserify task on fs changes.', function() {
     var done = this.async();
     var args = '-v' + browserifyArgs(arguments);
@@ -67,8 +46,7 @@ module.exports = function(grunt) {
     p.on('close', done);
   });
 
-  grunt.registerTask('uglify', 'Generate "bundle/webppl-editor.min.js".', function() {
-    child_process.execSync('mkdir -p bundle');
+  grunt.registerTask('uglify', 'Generate "docs/webppl-editor.min.js".', function() {
     child_process.execSync('uglifyjs docs/webppl-editor.js -b ascii_only=true,beautify=false > docs/webppl-editor.min.js');
   });
 
