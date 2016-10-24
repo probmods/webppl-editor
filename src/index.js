@@ -427,7 +427,7 @@ var CodeEditor = React.createClass({
           // We can use the following information for highlighting a
           // suitable point in the user program.
           var wpplError = error.wpplError,
-              lineNumber = wpplError.lineNumber,
+              lineNumber = wpplError.lineNumber - 1,
               columnNumber = wpplError.columnNumber,
               endColumn = wpplError.name ? columnNumber + wpplError.name.length : Infinity;
           var cm = comp.refs.editor.getCodeMirror();
@@ -448,7 +448,7 @@ var CodeEditor = React.createClass({
 
         var re_line = /Line ([0-9]+): /;
         if (re_line.test(message)) {
-          var line = re_line.exec(message)[1] - 1;
+          var line = parseInt(re_line.exec(message)[1]) - 1;
           cm.markText({line: line, ch: 0},
                       {line: line, ch: Infinity},
                       {className: "CodeMirrorError", clearOnEnter: true});
