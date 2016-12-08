@@ -294,10 +294,8 @@ var CodeEditor = React.createClass({
     var runT0, runClockId;
 
     var endJob = function(store, returnValue) {
-      clearInterval(runClockId);
       var renderedReturnValue = renderReturnValue(returnValue);
       comp.addResult({type: 'text', message: renderedReturnValue });
-      comp.setState({runTime: (_.now() - runT0)/1000 + 's'});
       cleanup();
     }
 
@@ -310,15 +308,21 @@ var CodeEditor = React.createClass({
     }
 
     var cleanup = function() {
+      // remove completed job
+      jobsQueue.shift();
+
+      // stop the runtime clock
+      clearInterval(runClockId);
+      comp.setState({runTime: (_.now() - runT0)/1000 + 's',
+                     execution: 'idle'});
+
+      // undo global variable changes
       global['console'] = nativeConsole;
       global['print'] = null;
       global['resumeTrampoline'] = null;
       global['onerror'] = null;
       wpEditor['makeResultContainer'] = null;
-      comp.setState({execution: 'idle'});
 
-      // remove completed job
-      jobsQueue.shift();
       // if there are remaining jobs, start on the next one
       if (jobsQueue.length > 0) {
         jobsQueue[0]()
