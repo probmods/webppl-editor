@@ -42357,9 +42357,14 @@ var renderReturnValue = function (x) {
     return '';
   }
 
-  if (x && x.score != undefined && x.sample != undefined)
-    // TODO: show something more useful by default?
+  if (x && x.score != undefined && x.sample != undefined) if (typeof viz == 'undefined') {
     return '<distribution>';
+  } else {
+    if (typeof viz.auto == 'function') {
+      viz.auto(x);
+      return;
+    }
+  }
 
   if (typeof x == 'function') return '<function ' + x.name + '>';
 
