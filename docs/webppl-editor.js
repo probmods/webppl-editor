@@ -42358,7 +42358,7 @@ var renderReturnValue = function (x) {
   }
 
   if (x && x.score != undefined && x.sample != undefined) if (typeof viz == 'undefined') {
-    return '<distribution>';
+    return util.serialize(x);
   } else {
     if (typeof viz.auto == 'function') {
       viz.auto(x);
