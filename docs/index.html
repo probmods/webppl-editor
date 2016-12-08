@@ -1706,6 +1706,27 @@ globalStore["x"] = 1 + 1;
 globalStore["x"] = 1 + 1;
 globalStore["x"] = 1 + 1;
       </code></pre>
+
+      untapifying AD values:
+      <pre><code>// test as a webppl call
+var m1 = function() { var x = gaussian(0,1); print(x); return x };
+// test as a vanilla js call
+var m2 = function() { var x = gaussian(0,1); window.print(x); return x };
+
+
+print(Infer({
+  method: 'MCMC',
+  kernel: 'HMC',
+  samples: 20,
+  model: m1
+}))
+
+print(Infer({
+  method: 'MCMC',
+  kernel: 'HMC',
+  samples: 20,
+  model: m2
+}))</code></pre>
     </div>
     <div class="col">
       <h3>error handling</h3>

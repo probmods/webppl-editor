@@ -220,6 +220,35 @@ var ResultList = React.createClass({
 
 var jobsQueue = [], compileCache = {};
 
+// untape AD values
+var unAd = function() {
+  var ad = global.ad;
+  if (typeof ad == 'undefined') {
+    unAd = function(x) { return x }
+  } else {
+    unAd = function(x) {
+      if (global.ad.isLifted(x)) {
+        return x.x;
+      } else if (_.isArray(x)) {
+        return _.map(x, unAd);
+      } else if (x instanceof ad.tensor.__Tensor) {
+        // Optimization: tensors don't contain tapes, so return now rather
+        // than descend into the tensor object.
+        return x;
+      } else if (_.isObject(x) && !_.isFunction(x)) {
+        // Ensure prototype chain is preserved
+        var proto = Object.getPrototypeOf(x);
+        var y = _.mapObject(x, unAd);
+        return _.extendOwn(Object.create(proto), y);
+        return y;
+      } else {
+        return x;
+      }
+    }
+
+  }
+}
+
 var CodeEditor = React.createClass({
   getInitialState: function() {
     return {
@@ -234,21 +263,25 @@ var CodeEditor = React.createClass({
   // the actively running codebox will inject them into global once it starts running
   // ------------------------------------------------------------
   print: function(s,k,a,x) {
-    // make print work as a regular js function
-    if (arguments.length == 1) {
-      this.addResult({type: 'text',
-                      message: typeof x == 'object' ? JSON.stringify(arguments[0]) : arguments[0]})
-      return;
+    // make print work as a vanilla js function
+    var isVanillaCall = (arguments.length == 1);
+    if (isVanillaCall) {
+      x = arguments[0];
     }
 
     // if x has a custom printer, use it
     if (x.__print__) {
       return k(s, x.__print__(x));
     } else {
-      var type = typeof x;
+      var _x = unAd(x);
+      var type = typeof _x;
       this.addResult({type: 'text',
-                      message: _.contains(['object', 'boolean', 'number'], type) ? JSON.stringify(x) : x})
-      return k(s)
+                      message: _.contains(['object', 'boolean', 'number'], type) ? JSON.stringify(_x) : _x})
+      if (isVanillaCall) {
+        return;
+      } else {
+        return k(s)
+      }
     }
   },
   makeResultContainer: function() {
