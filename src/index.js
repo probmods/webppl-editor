@@ -284,13 +284,15 @@ var CodeEditor = React.createClass({
       }
     }
   },
-  makeResultContainer: function() {
-    // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
+  makeResultContainer: function(options) {
     this.addResult(_.extend({type: 'DOM'}));
 
     // return the most recent custom component
     // TODO: don't depend on jquery for this
     var element = _.last($(ReactDOM.findDOMNode(this)).find('.custom'));
+    if (options.css) {
+      $(element).css(options.css)
+    }
     return element;
   },
   // ------------------------------------------------------------
