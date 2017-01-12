@@ -42616,8 +42616,8 @@ var CodeEditor = React.createClass({
       }
     }
   },
-  makeResultContainer: function (options) {
-    // TODO: take property arguments so that we can, e.g., make the div inline or have a border or something
+  makeResultContainer: function (_options) {
+    var options = _.defaults(_options || {}, {});
     this.addResult(_.extend({ type: 'DOM' }));
 
     // return the most recent custom component
