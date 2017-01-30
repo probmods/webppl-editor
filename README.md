@@ -31,7 +31,6 @@ preEls.map(function(el) { editor.setup(el, {language: 'webppl'}); });
 - `editor.get([key])`: retrieves the object with key `key`. When called with no key, returns the entire store.
 - `editor.MCMCProgress()`: displays a progress bar during MCMC inference (work in progress).
 - `print` prints an object the results section (works both in WebPPL and vanilla Javascript).
-- `resumeTrampoline`: resumes trampolining WebPPL code; used for external library functions that need to do asynchronous work.
 
 We also ship the editor as `editor.ReactComponent`.
 

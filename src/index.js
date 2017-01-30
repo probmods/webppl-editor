@@ -356,7 +356,6 @@ var CodeEditor = React.createClass({
       // undo global variable changes
       global['console'] = nativeConsole;
       global['print'] = null;
-      global['resumeTrampoline'] = null;
       global['onerror'] = null;
       wpEditor['makeResultContainer'] = null;
 
@@ -540,7 +539,6 @@ var CodeEditor = React.createClass({
                                         endJob,
                                         {errorHandlers: [handleRunError], debug: true, baseRunner: baseRunner});
           comp.runner = baseRunner;
-          global['resumeTrampoline'] = prepared.runner;
 
           comp.setState({execution: 'running'});
 
